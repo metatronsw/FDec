@@ -1,3 +1,3 @@
 # FDec
 
-A description of this package.
+A fixed decimal number format.
