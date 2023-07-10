@@ -21,8 +21,8 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	static let max:  Base =       922_337_203_685_475
 	static let min:  Base =      -922_337_203_685_475
 
-	static let decimalPlaces: Base = 4
-	static let decimalMultipler: Base = 10_000
+	public static let decimalPlaces: Base = 4
+	public static let decimalMultipler: Base = 10_000
 	
 
 	public var value: Base
