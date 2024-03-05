@@ -21,7 +21,7 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	static let max:  Base =       922_337_203_685_475
 	static let min:  Base =      -922_337_203_685_475
 
-	public static let decimalPlaces: Base = 4
+	public static let decimalPlaces: Base = 4  // Fontos ! ! ! Fölötte levágja
 	public static let decimalMultipler: Base = 10_000
 	
 
@@ -149,7 +149,10 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 		let parts = value.replacingOccurrences(of: "_", with: "").components(separatedBy: ".")
 		let integer = parts.first!.prefix(15)
 		
-		guard parts.count > 1 else { self.value = (Int(integer) ?? 0) * pow ; return }
+		guard parts.count > 1 else {
+			self.value = (Int(integer) ?? 0) * pow
+			return
+		}
 		
 		
 		
@@ -158,7 +161,6 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 		let whole = String(integer + fraction) + String(repeating: "0", count: (exp-fraction.count) )
 		
 		self.value = Int(whole) ?? 0
-		
 		
 //		print(description)
 		
@@ -171,9 +173,12 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 		let parts = string.replacingOccurrences(of: "_", with: "").components(separatedBy: ".")
 		let integer = parts.first!.prefix(15)
 		
+		print(parts)
+		
 		guard parts.count > 1 else {
-			
-			guard let int = Int(integer) else { return nil }
+			guard let int = Int(integer) else {
+				return nil
+			}
 			self.value = int * pow
 			return
 		}
@@ -296,6 +301,7 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	public var double: Double {
 		return Double(value) / Double(pow)
 	}
+	
 	
 	public var cgFloat: CGFloat {
 		return CGFloat(value) / CGFloat(pow)
@@ -540,6 +546,10 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 
 	}
 
+	public func formatted() -> String {
+//		getFormated(showSign: false)
+		string
+	}
 	
 	/// Retun kisebb
 	public func min(_ x: FDec, _ y: FDec ) -> FDec {
