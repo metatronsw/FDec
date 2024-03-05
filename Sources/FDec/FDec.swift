@@ -547,8 +547,7 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	}
 
 	public func formatted() -> String {
-//		getFormated(showSign: false)
-		string
+		getFormated(showSign: false)
 	}
 	
 	/// Retun kisebb
