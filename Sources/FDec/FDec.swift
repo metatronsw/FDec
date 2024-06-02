@@ -9,33 +9,438 @@ import Foundation
 
 public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStringLiteral, Hashable, CustomStringConvertible, CustomDebugStringConvertible, Comparable, Codable {
 	
-	public typealias Base = Int
 	public typealias IntegerLiteralType = Int
 	public typealias StringLiteralType = String
 	public typealias FloatLiteralType = Double
 	
-	private static let half: Base = 1_000_000_000
-	private static let high: Base = 100_000_000_000_000
-	private static let full: Base = 1_000_000_000_000_000_000
-//	static let max:  Base =       922_337_203_685_475
-//	static let min:  Base =      -922_337_203_685_475
-
-	/// Important
-	public static let decimalPlaces: Base = 4
-	private static let pow: Base = 10_000
+	private static let half: Int =             1_000_000_000
+	private static let high: Int =       100_000_000_000_000
+	private static let full: Int = 1_000_000_000_000_000_000
+										 // 9_223_372_036_854_775_807
 	
-
-	public var value: Base
-	public var over: String? = nil
-
-	public var exp: Base = Self.decimalPlaces {
-		didSet { self.pow = Self.raise(exp) }
+	
+	/// Static variable that defines the maximum decimal numbers at the Structural level.
+	public static var decimalsNum: Int = 4
+	
+	private(set) var value: Int
+	private(set) var pow: Int
+	
+	
+	
+	// MARK: Init
+	
+	public init() {
+		self.value = 0
+		self.pow = Self.decimalsNum.raise
 	}
 	
-	private var pow: Base = Self.pow
 	
-	static func raise(_ num: Base) -> Base {
-		switch num {
+	public init?(integer: String, fraction: String? = nil, dec: Int = Self.decimalsNum) {
+		
+		self.pow = dec.raise
+		let dp = String(self.pow).count - 1
+		
+		if var fraction {
+			while fraction.count != dp { fraction.append("0") }
+			
+			if let raw = Int(integer + fraction) {
+				self.value = raw
+				return
+			}
+			
+		} else {
+			
+			if let int = Int(integer) {
+				self.value = int * self.pow
+				return
+			}
+		}
+		
+		return nil
+	}
+	
+	
+	/// Quick initialization with an integer number already prepared. Be careful, there is no limit to the value of decimals, above 15 it will be unusable...
+	public init(raw: Int, decimals: Int = Self.decimalsNum) {
+		self.value = raw
+		self.pow = decimals.raise
+	}
+	
+	
+	public init(integerLiteral value: Int) {
+		
+		self.pow = Self.decimalsNum.raise
+		
+		let (num, over) = value.multipliedReportingOverflow(by: self.pow)
+		self.value = num
+		
+		if over { Self.overFlow(String(num)) }
+		
+	}
+	
+	public init(_ value: Int) { self.init(integerLiteral: value) }
+	public init(_ value: Int8) { self.init(integerLiteral: Int(value)) }
+	public init(_ value: UInt8) { self.init(integerLiteral: Int(value)) }
+	public init(_ value: Int16) { self.init(integerLiteral: Int(value)) }
+	public init(_ value: UInt16) { self.init(integerLiteral: Int(value)) }
+	public init(_ value: Int32) { self.init(integerLiteral: Int(value)) }
+	public init(_ value: UInt32) { self.init(integerLiteral: Int(value)) }
+	
+	public init?<T>(exactly source: T) where T : BinaryInteger { self.init(integerLiteral: Int(source)) }
+	
+	
+	
+	public init(floatLiteral value: Double) {
+		self.pow = Self.decimalsNum.raise
+		if value > Double(Int.max / self.pow).magnitude { Self.overFlow(String(value)) }
+		
+		self.value = Int(value * Double(pow))
+	}
+	
+	public init(_ value: Double) { self.init(floatLiteral: value) }
+	
+	public init(_ value: Float) { self.init(floatLiteral: Double(value)) }
+	
+	
+	
+	public init(stringLiteral value: String) {
+		
+		self.init()
+		
+		let parts = value.replacingOccurrences(of: "_", with: "").components(separatedBy: ".")
+		let integer = parts.first!
+		
+		guard integer.count < 15 else { Self.overFlow(value) ; return }
+		
+		guard parts.count > 1 else {
+			guard let int = Int(integer) else { Self.overFlow("Int cast") ; return }
+			self.init(integerLiteral: int)
+			return
+		}
+		
+		let fraction = parts[1].prefix(Self.decimalsNum)
+		
+		let whole = String(integer + fraction) + String(repeating: "0", count: Self.decimalsNum - fraction.count )
+		
+		guard let raw = Int(whole) else { Self.overFlow("Int cast") ; return }
+		
+		self.init(raw: raw)
+		
+	}
+	
+	public init?(string value: String) { self.init(stringLiteral: value) }
+	
+	public init?(_ value: String) { self.init(stringLiteral: value) }
+	
+	
+	
+	
+	
+	
+	// MARK: Encode-Decode
+	
+	/// Saving the private 'pow' variable is unnecessary, it must be added directly when decoding
+	public func encode(to encoder: Encoder) throws {
+		
+		var container = encoder.singleValueContainer()
+		try container.encode(value)
+	}
+	
+	
+	/// For correct decoding of the private pow variable, check the value of the Structure static 'decimalsNum'
+	public init(from decoder: Decoder) throws {
+		
+		let value = try decoder.singleValueContainer()
+		self.value = try value.decode(Int.self)
+		self.pow = Self.decimalsNum.raise
+	}
+	
+	
+	
+	
+	
+	// MARK: Computed values
+	
+	public var description: String {
+		guard value != 0 else { return "0" }
+		
+		let dp = decimalPlaces
+		guard isDecimal else { return String(String(value).dropLast(dp)) }
+		
+		var string: String
+		var whole = String(value.magnitude)
+		
+		if whole.count <= dp { string = sign + "0." + String(repeating: "0", count: dp-whole.count) + whole }
+		else {
+			whole.insert(".", at: whole.index(whole.endIndex, offsetBy: -dp) )
+			string = sign + whole
+		}
+		
+		string.dropLastZeros()
+		
+		return string
+	}
+	
+	public var debugDescription: String {
+		"\(description) ➞ \(value) * 10^\(decimalPlaces) ➞ \(asInt) & \(fraction)"
+	}
+	
+	public var sign: String { (value < 0) ? "-" : "" }
+	
+	public var signFull: String { (value < 0) ? "-" : "+" }
+	
+	public var magnitude: FDec {
+		var mag = self
+		mag.value = Int(self.value.magnitude)
+		return mag
+	}
+	
+	public var decimalPlaces: Int { String(self.pow).count - 1 }
+	
+	public var asInt: Int { value / pow }
+	
+	public var asDouble: Double { Double(value) / Double(pow) }
+	
+	public var fraction: Double { Double(value % pow) / Double(pow) }
+	
+	public func formatted() -> String { getFormated(showSign: false) }
+	
+	public var digitCount: Int { Int(log10(Double(self.asInt))) + 1 }
+	
+	
+	
+	
+	// MARK: Questions
+	
+	public static var isSigned: Bool { true }
+	
+	public var isPositive : Bool { self.value > 0 }
+	public var isNegative : Bool { self.value < 0 }
+	public var isZero     : Bool { self.value == 0 }
+	public var isOdd      : Bool { self.value & 1 == 1 }
+	public var isEven     : Bool { self.value & 1 == 0 }
+	public var isDecimal  : Bool { return (value % pow) != 0 }
+	
+	
+	
+	
+	
+	// MARK: Arithmetic
+	
+	public mutating func negate() { self.value *= -1 }
+	
+	public static func + (lhs: FDec, rhs: FDec) -> FDec {
+		
+		let (value, overflow) = lhs.value.addingReportingOverflow(rhs.value)
+		
+		if overflow { overFlow(String(value)) }
+		
+		return FDec(raw: value)
+	}
+	
+	public static func + (lhs: FDec, rhs: Int) -> FDec  { lhs + FDec(rhs) }
+	public static func + (lhs: Int, rhs: FDec) -> FDec  { FDec(lhs) + rhs }
+	public static func += (lhs: inout FDec, rhs: FDec)  { lhs = lhs + rhs }
+	public static func += (lhs: inout FDec, rhs: Int)   { lhs = lhs + FDec(rhs) }
+	
+	public static func - (lhs: FDec, rhs: FDec) -> FDec { lhs + (-rhs) }
+	public static func - (lhs: FDec, rhs: Int) -> FDec  { lhs + FDec(-rhs) }
+	public static func - (lhs: Int, rhs: FDec) -> FDec  { FDec(lhs) + (-rhs) }
+	public static func -= (lhs: inout FDec, rhs: FDec)  { lhs = lhs + (-rhs) }
+	public static func -= (lhs: inout FDec, rhs: Int)   { lhs = lhs + FDec(-rhs) }
+	
+	
+	
+	
+	//	* Multiplication
+	
+	public static func * (lhs: FDec, rhs: FDec) -> FDec {
+		
+		let (high, low) = mulSplit(lhs.value, rhs.value)
+		let (top, overflow) = high.multipliedReportingOverflow(by: Self.high)
+		
+		if overflow { overFlow("\(lhs.value) * \(rhs.value) › \(high)|\(low)") }
+		
+		return FDec(raw: top + (low / lhs.pow) )
+		
+	}
+	
+	public static func *= (lhs: inout FDec, rhs: FDec) { lhs = lhs * rhs }
+	public static func *= (lhs: inout FDec, rhs: Int)  { lhs = lhs * FDec(rhs) }
+	
+	
+	//  / Divison
+	
+	public static func / (lhs: FDec, rhs: FDec) -> FDec {
+		
+		return FDec(raw: (lhs.value * lhs.pow) / (rhs.value) )
+	}
+	
+	public static func /= (lhs: inout FDec, rhs: FDec) { lhs = lhs / rhs }
+	public static func /= (lhs: inout FDec, rhs: Int)  { lhs = lhs / FDec(rhs) }
+	
+	
+	
+	
+	public static func % (lhs: FDec, rhs: FDec) -> FDec {
+		
+		return FDec(raw: (lhs.value * lhs.pow) % (rhs.value) )
+	}
+	
+	public func quotientAndRemainder(dividingBy rhs: FDec) -> (quotient: FDec, remainder: FDec) {
+		
+		let (quotient, remainder) = self.value.quotientAndRemainder(dividingBy: rhs.value)
+		
+		return ( FDec(raw: quotient), FDec(raw: remainder) )
+	}
+	
+	
+	
+	
+	// MARK: Compare
+	
+	public static func < (lhs: FDec, rhs: FDec) -> Bool {
+		
+		guard lhs.pow == rhs.pow  else { return false }
+		return lhs.value < rhs.value
+	}
+	
+	public static func == (lhs: FDec, rhs: FDec) -> Bool {
+		
+		guard lhs.pow == rhs.pow  else { return false }
+		return lhs.value == rhs.value
+	}
+	
+	public static func > (lhs: FDec, rhs: FDec) -> Bool { !(lhs < rhs) }
+	
+	public static func != (lhs: FDec, rhs: FDec) -> Bool { !(lhs == rhs) }
+	
+	
+	
+	
+	
+	// MARK: Internal Functions
+	
+	
+	internal static func mulSplit(_ lhs: Int, _ rhs: Int) -> (high: Int, low: Int) {
+		
+		
+		let (lLo, lHi) = (lhs % Self.half, lhs / Self.half)
+		let (rLo, rHi) = (rhs % Self.half, rhs / Self.half)
+		
+		let K = (lHi * rLo) + (rHi * lLo)
+		
+		var resHi = (lHi * rHi) + (K / Self.half)
+		var resLo = (lLo * rLo) + ((K % Self.half) * Self.half)
+		
+		if resLo >= Self.full {
+			resLo -= Self.full
+			resHi += 1
+		}
+		
+		return (resHi, resLo)
+	}
+	
+	
+	private static func overFlow(_ str: String? = nil, sender: String = #function ) {
+		fatalError("Overflow: \(str ?? "") from \(sender)")
+	}
+	
+	
+	
+	
+	// MARK: Public Functions
+	
+	public static func random(_ rangeInt: ClosedRange<Int>, _ rangeFraction: ClosedRange<Int>? = nil, decimals: Int = Self.decimalsNum) -> FDec? {
+		
+		let rnd = Int.random(in: rangeInt)
+		let (int, overInt) = rnd.multipliedReportingOverflow(by: decimals.raise)
+		if overInt { return nil }
+
+		let dec = rangeFraction == nil ? 0 : Int.random(in: rangeFraction!)
+		let raw = int + dec
+		
+		return FDec(raw: raw)
+	}
+	
+	
+	public func abs(_ x: FDec) -> FDec { FDec(raw: Int(x.value.magnitude) ) }
+	
+	
+	public func hash(into hasher: inout Hasher) { hasher.combine("\(self.value)\(self.pow)") }
+	
+
+	public func min(_ x: FDec, _ y: FDec ) -> FDec { (x < y) ? x: y }
+
+
+	public func max(_ x: FDec, _ y: FDec ) -> FDec { (x > y) ? x: y }
+
+	
+	
+	public func getFormated(showSign: Bool = true, groupingSize: Int = 3, decimalSeparator: String? = nil, groupingSeparator: String? = nil) -> String {
+		
+		guard value != 0 else { return "0" }
+		
+		let decimalSep = decimalSeparator ?? (Locale.current.decimalSeparator ?? ".")
+		let groupingSep = groupingSeparator ?? (Locale.current.groupingSeparator ?? " ")
+		
+		let whole = String(value.magnitude)
+		let signstr = showSign ? signFull : sign
+		
+		let dp = decimalPlaces
+		
+		guard whole.count > dp else {
+			var frc = signstr + "0" + decimalSep + String(repeating: "0", count: dp-whole.count) + whole
+			while frc.hasSuffix("0") { frc.removeLast() }
+			return frc
+		}
+		
+		
+		let int = String(whole.dropLast(dp))
+		var frc = String(whole.suffix(dp))
+		
+		var gapPoint = int.count % groupingSize
+		if groupingSize >= int.count { gapPoint = int.count + 2 }
+		else if gapPoint == 0 { gapPoint = groupingSize }
+		
+		var index = 1
+		var string = signstr
+		
+		for chr in int {
+			if index > gapPoint {
+				string.append("\(groupingSep)\(chr)")
+				gapPoint += groupingSize - 1
+				continue
+			}
+			
+			string.append(chr)
+			index += 1
+		}
+		
+		if frc == "0000" { return string }
+		frc.dropLastZeros()
+		
+		return string + decimalSep + frc
+		
+		
+	}
+	
+	
+}
+
+
+extension String {
+	
+	internal mutating func dropLastZeros()  {
+		while self.hasSuffix("0") { self.removeLast() }
+	}
+}
+
+
+extension Int {
+	
+	internal var raise: Int {
+		switch self {
 			case 0:  return 1
 			case 1:  return 10
 			case 2:  return 100
@@ -59,502 +464,4 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 		}
 	}
 	
-	
-	
-	
-	// MARK: Init
-	
-	public init() { self.value = 0 }
-
-	
-	public init?(integer: String, fraction: String? = nil, dec: Int? = nil) {
-		
-		self.exp = Base(dec ?? Self.decimalPlaces)
-		
-		
-		if var frc = fraction {
-			while frc.count != self.exp { frc.append("0") }
-			
-			if let val = Base(integer + frc) {
-				self.value = val
-				return
-			}
-			
-		} else {
-			
-			if let val = Base(integer) {
-				self.value = val * pow
-				return
-			}
-		}
-		
-		return nil
-	}
-	
-	
-	public init(raw: Base, dec: Int? = nil, over: String? = nil) {
-		
-		if let dec {
-			self.exp = Base(dec)
-			self.pow = Self.raise(exp)
-		}
-		
-		self.value = raw
-		self.over = over
-	}
-	
-
-	
-	
-	public init(integerLiteral value: Int) {
-		
-		let (num, overflow) = value.multipliedReportingOverflow(by: pow)
-		guard !overflow else { fatalError("Overflow: \(value) !") }
-		
-		self.value = num
-	}
-	
-	public init(_ value: Int) { self.init(integerLiteral: value) }
-	public init(_ value: Int8) { self.init(integerLiteral: Int(value)) }
-	public init(_ value: UInt8) { self.init(integerLiteral: Int(value)) }
-	public init(_ value: Int16) { self.init(integerLiteral: Int(value)) }
-	public init(_ value: UInt16) { self.init(integerLiteral: Int(value)) }
-	public init(_ value: Int32) { self.init(integerLiteral: Int(value)) }
-	public init(_ value: UInt32) { self.init(integerLiteral: Int(value)) }
-	
-	public init?<T>(exactly source: T) where T : BinaryInteger { self.init(integerLiteral: Base(source) ) }
-	
-	
-	
-	
-	
-	public init(floatLiteral value: Double) {
-		
-		let num = value * Double(pow)
-		guard num < Double(Base.max), value > Double(Base.min) else { fatalError("Overflow: \(value) !") }
-		
-		self.value = Base(num)
-		
-	}
-	
-	public init(_ value: Double) { self.init(floatLiteral: value) }
-	
-	public init(_ value: Float) { self.init(floatLiteral: Double(value)) }
-	
-	
-	
-	
-	
-	/// int hosszúságát dinamikusra venni !
-	public init(stringLiteral value: String) {
-		
-		let parts = value.replacingOccurrences(of: "_", with: "").components(separatedBy: ".")
-		let integer = parts.first!.prefix(15)
-		
-		guard parts.count > 1 else {
-			self.value = (Int(integer) ?? 0) * pow
-			return
-		}
-		
-		let fraction = parts[1].prefix(exp)
-		
-		let whole = String(integer + fraction) + String(repeating: "0", count: (exp-fraction.count) )
-		
-		self.value = Int(whole) ?? 0
-		
-//		print(description)
-		
-	}
-	
-	
-	public init?(string value: String) {
-		
-		let string = value.trimmingCharacters(in: .whitespaces)
-		let parts = string.replacingOccurrences(of: "_", with: "").components(separatedBy: ".")
-		let integer = parts.first!.prefix(15)
-		
-		print(parts)
-		
-		guard parts.count > 1 else {
-			guard let int = Int(integer) else {
-				return nil
-			}
-			self.value = int * pow
-			return
-		}
-		
-		
-		let fraction = parts[1].prefix(exp)
-		
-		let whole = String(integer + fraction) + String(repeating: "0", count: (exp-fraction.count) )
-		
-		guard let int = Int(whole) else { return nil }
-		self.value = int
-		return
-		
-//		print(description)
-		
-	}
-	
-	
-
-	
-	
-	
-	// MARK: Encode-Decode
-	
-	
-	public func encode(to encoder: Encoder) throws {
-		
-		var container = encoder.singleValueContainer()
-		try container.encode(value)
-	}
-	
-	
-	public init(from decoder: Decoder) throws {
-		
-		let value = try decoder.singleValueContainer()
-		
-		self.init()
-		self.value = try value.decode(Base.self)
-	}
-	
-	
-	
-	// MARK: Computed values
-	
-	
-	
-	public var description: String {
-//		guard over == nil else { return over! }
-//		return "\(value / pow).\((value % pow).magnitude)"
-		return string
-	}
-	
-	
-	public var debugDescription: String {
-		return string
-//		guard over == nil else { return "«\(over!)»  ^ \(exp)"}
-//		return "[\(value)]^(\(exp)) ➞ {\(integer)|\(fraction)} (\(isFraction ? "fract" : "int"))"
-	}
-	
-	
-	public var string: String {
-		
-		guard value != 0 else { return "0" }
-		guard over == nil else { return over! }
-		guard isFraction else { return String(String(value).dropLast(exp)) }
-		
-		var string: String
-		var whole = String(value.magnitude)
-		
-		if whole.count <= exp { string = sign + "0." + String(repeating: "0", count: exp-whole.count) + whole }
-		else {
-			whole.insert(".", at: whole.index(whole.endIndex, offsetBy: -exp) )
-			
-			if let over {
-				string = sign + String(over) + "|" + whole
-			} else {
-				string = sign + whole
-			}
-		}
-
-		while string.hasSuffix("0") { string.removeLast() }
-		
-		return string
-	}
-	
-	
-	public var integer: Int {
-		return value / pow
-	}
-	
-	
-	public var fraction: Double {
-		return Double(value % pow) / Double(pow)
-	}
-	
-	
-	public var sign: String {
-		return (value < 0) ? "-" : ""
-	}
-
-	
-	public var fullsign: String {
-		return (value < 0) ? "-" : "+"
-	}
-	
-	
-	public var magnitude: FDec {
-		var mag = self
-		mag.value = Base(self.value.magnitude)
-		return mag
-	}
-	
-	
-	public var int64: Int64 {
-		Int64(self.value)
-	}
-	
-	
-	public var double: Double {
-		return Double(value) / Double(pow)
-	}
-	
-	
-	public var cgFloat: CGFloat {
-		return CGFloat(value) / CGFloat(pow)
-	}
-
-	
-	
-	
-		// MARK: Questions
-	
-	public var isPositive : Bool { self.value > 0 }
-	public var isNegative : Bool { self.value < 0 }
-	
-	public var isZero     : Bool { self.value == 0 }
-	public var isNotZero  : Bool { self.value != 0  }
-	
-	public var isOdd      : Bool { self.value & 1 == 1 }
-	public var isEven     : Bool { self.value & 1 == 0 }
-	
-	public var isFraction : Bool { return (value % pow) != 0 }
-	public var isDecimal  : Bool { return (value % pow) == 0 }
-	
-	public static var isSigned: Bool { true }
-	
-	
-	
-	
-	
-		// MARK: Arithmetic
-	
-	public mutating func negate() { self.value *= -1 }
-	
-		// + Addicion
-//	public prefix static func + (x: FDec) -> FDec { x }
-	
-	public static func + (lhs: FDec, rhs: FDec) -> FDec {
-		
-		let (value, overflow) = lhs.value.addingReportingOverflow(rhs.value)
-
-		if overflow { print("Error >> Overflow!") }
-
-		return FDec(raw: value)
-		
-	}
-	
-	public static func + (lhs: FDec, rhs: Int) -> FDec  { lhs + FDec(rhs) }
-	public static func + (lhs: Int, rhs: FDec) -> FDec  { FDec(lhs) + rhs }
-	public static func += (lhs: inout FDec, rhs: FDec)  { lhs = lhs + rhs }
-	public static func += (lhs: inout FDec, rhs: Int)   { lhs = lhs + FDec(rhs) }
-	
-
-
-	
-	
-	
-		// - Subtraction
-//	public prefix static func - (x: FDec) -> FDec { var y = x ; y.value *= -1 ; return y }
-	
-	public static func - (lhs: FDec, rhs: FDec) -> FDec {
-		
-		let (value, overflow) = lhs.value.subtractingReportingOverflow(rhs.value)
-		
-		if overflow { print("Error >> Overflow!") }
-		
-		return FDec(raw:  value)
-		
-	}
-	
-	public static func - (lhs: FDec, rhs: Int) -> FDec  { lhs - FDec(rhs) }
-	public static func - (lhs: Int, rhs: FDec) -> FDec  { FDec(lhs) - rhs }
-	public static func -= (lhs: inout FDec, rhs: FDec)  { lhs = lhs - rhs }
-	public static func -= (lhs: inout FDec, rhs: Int)   { lhs = lhs - FDec(rhs) }
-	
-
-
-	
-		//	* Multiplication
-	
-	public static func * (lhs: FDec, rhs: FDec) -> FDec {
-		
-		let (value, overflow) = lhs.value.multipliedReportingOverflow(by: rhs.value)
-		
-		guard overflow else { return FDec(raw: value / lhs.pow ) }
-		
-		
-		let (high, low) = mulSplit(lhs.value, rhs.value)
-		let (top, overflow2) = high.multipliedReportingOverflow(by: Self.high)
-		
-	
-		if overflow2 { print("\(high)|\(low) >> Overflow!")
-			return FDec(raw:  0, over: "\(high)\(low / lhs.pow / lhs.pow)")
-		}
-	
-		return FDec(raw:  top + (low / lhs.pow) )
-		
-	}
-	
-	public static func *= (lhs: inout FDec, rhs: FDec) { lhs = lhs * rhs }
-	public static func *= (lhs: inout FDec, rhs: Int)  { lhs = lhs * FDec(rhs) }
-
-	
-	 //  / Divison
-	
-	public static func / (lhs: FDec, rhs: FDec) -> FDec {
-		
-		return FDec(raw:  (lhs.value * lhs.pow) / (rhs.value) )
-		
-	}
-	
-	public static func /= (lhs: inout FDec, rhs: FDec) { lhs = lhs / rhs }
-	public static func /= (lhs: inout FDec, rhs: Int)  { lhs = lhs / FDec(rhs) }
-	
-	
-		/// MEGIRNI RENDESEN
-	public static func % (lhs: FDec, rhs: FDec) -> FDec {
-		
-		return FDec(raw: (lhs.value * lhs.pow) % (rhs.value) )
-		
-	}
-	
-	public func quotientAndRemainder(dividingBy rhs: FDec) -> (quotient: FDec, remainder: FDec) {
-		
-		let (quotient, remainder) =	self.value.quotientAndRemainder(dividingBy: rhs.value)
-		
-		return ( FDec(raw: quotient), FDec(raw: remainder) )
-	}
-	
-	
-	
-	
-		// MARK: Compare
-	
-	public static func < (lhs: FDec, rhs: FDec) -> Bool {
-
-		if lhs.value < rhs.value { return true }
-			//		if lhs.exp != rhs.exp  { return false }
-		
-		return false
-	}
-	
-	public static func == (lhs: FDec, rhs: FDec) -> Bool {
-		
-		if lhs.value != rhs.value  { return false }
-			//		if lhs.exp != rhs.exp  { return false }
-		
-		return true
-	}
-	
-	public static func > (lhs: FDec, rhs: FDec) -> Bool { !(lhs < rhs) }
-	
-	public static func != (lhs: FDec, rhs: FDec) -> Bool { !(lhs == rhs) }
-	
-	
-	
-	
-	
-		// MARK: Misc Functions
-	
-	internal static func mulSplit(_ lhs: Base, _ rhs: Base) -> (high: Base, low: Base) {
-
-		
-		let (lLo, lHi) = (lhs % Self.half, lhs / Self.half)
-		let (rLo, rHi) = (rhs % Self.half, rhs / Self.half)
-
-		let K = (lHi * rLo) + (rHi * lLo)
-
-		var resHi = (lHi * rHi) + (K / Self.half)
-		var resLo = (lLo * rLo) + ((K % Self.half) * Self.half)
-
-		if resLo >= Self.full {
-			resLo -= Self.full
-			resHi += 1
-		}
-
-		return (resHi, resLo)
-	}
-	
-	
-	public func abs(_ x: FDec) -> FDec {
-		return FDec(raw: Base(x.value.magnitude) )
-	}
-	
-	
-	public static func random(_ rangeInt: ClosedRange<Int>, rangeFraction: ClosedRange<Int>? = nil) -> FDec {
-		return FDec(raw: Int.random(in: rangeInt))
-	}
-	
-	
-	public func hash(into hasher: inout Hasher) {
-		hasher.combine("\(self.value)\(self.exp)")
-	}
-	
-	
-	public func getFormated(showSign: Bool = true, groupingSize: Int = 3, decimalSeparator: String? = nil, groupingSeparator: String? = nil) -> String {
-		
-		guard value != 0 else { return "0" }
-
-		let decimalSep = decimalSeparator ?? (Locale.current.decimalSeparator ?? ".")
-		let groupingSep = groupingSeparator ?? (Locale.current.groupingSeparator ?? " ")
-		
-		let whole = String(value.magnitude)
-		let signstr = showSign ? fullsign : sign
-		
-		
-		guard whole.count > exp else {
-			var frc = signstr + "0" + decimalSep + String(repeating: "0", count: exp-whole.count) + whole
-			while frc.hasSuffix("0") { frc.removeLast() }
-			return frc
-		}
-		
-		
-		let int = whole.dropLast(exp)
-		var frc = whole.suffix(exp)
-
-		var gapPoint = int.count % groupingSize
-		if groupingSize >= int.count { gapPoint = int.count + 2 }
-		else if gapPoint == 0 { gapPoint = groupingSize }
-
-		var index = 1
-		var string = signstr
-
-		for chr in int {
-			if index > gapPoint {
-				string.append("\(groupingSep)\(chr)")
-				gapPoint += groupingSize - 1
-				continue
-			}
-
-			string.append(chr)
-			index += 1
-		}
-
-		if frc == "0000" { return string }
-		
-		while frc.hasSuffix("0") { frc.removeLast() }
-		return string + decimalSep + frc
-		
-
-	}
-
-	public func formatted() -> String {
-		getFormated(showSign: false)
-	}
-	
-	/// Retun kisebb
-	public func min(_ x: FDec, _ y: FDec ) -> FDec {
-		return (x < y) ? x: y
-	}
-	/// Retun nagyobb
-	public func max(_ x: FDec, _ y: FDec ) -> FDec {
-		return (x > y) ? x: y
-	}
-	
 }
-
-
-
