@@ -8,6 +8,7 @@ final class Test_Init: XCTestCase {
 	
 	func test_Init_Literal_Int() throws {
 		
+		
 		XCTAssertEqual( T(0), 0)
 		XCTAssertEqual( T(integerLiteral: 0), 0)
 		
