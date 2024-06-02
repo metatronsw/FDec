@@ -8,48 +8,31 @@
 import Foundation
 
 public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStringLiteral, Hashable, CustomStringConvertible, CustomDebugStringConvertible, Comparable, Codable {
-
-
+	
 	public typealias Base = Int
-
+	public typealias IntegerLiteralType = Int
 	public typealias StringLiteralType = String
 	public typealias FloatLiteralType = Double
 	
-	static let half: Base =             1_000_000_000
-	static let high: Base =       100_000_000_000_000
-	static let full: Base = 1_000_000_000_000_000_000
-	static let max:  Base =       922_337_203_685_475
-	static let min:  Base =      -922_337_203_685_475
+	private static let half: Base = 1_000_000_000
+	private static let high: Base = 100_000_000_000_000
+	private static let full: Base = 1_000_000_000_000_000_000
+//	static let max:  Base =       922_337_203_685_475
+//	static let min:  Base =      -922_337_203_685_475
 
-	public static let decimalPlaces: Base = 4  // Fontos ! ! ! Fölötte levágja
-	public static let decimalMultipler: Base = 10_000
+	/// Important
+	public static let decimalPlaces: Base = 4
+	private static let pow: Base = 10_000
 	
 
 	public var value: Base
 	public var over: String? = nil
-	
-	public var exp: Base = Self.decimalPlaces { didSet { self.pow = Self.raise(exp) } }
-	
-	private var pow: Base = Self.decimalMultipler
-	
-	
-	public func encode(to encoder: Encoder) throws {
 
-		var container = encoder.singleValueContainer()
-		try container.encode(value)
-	}
-
-
-	public init(from decoder: Decoder) throws {
-
-		let value = try decoder.singleValueContainer()
-
-		self.init()
-		self.value = try value.decode(Base.self)
+	public var exp: Base = Self.decimalPlaces {
+		didSet { self.pow = Self.raise(exp) }
 	}
 	
-	
-	
+	private var pow: Base = Self.pow
 	
 	static func raise(_ num: Base) -> Base {
 		switch num {
@@ -81,11 +64,34 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	
 	// MARK: Init
 	
-	public init() {
-		self.value = 0
+	public init() { self.value = 0 }
+
+	
+	public init?(integer: String, fraction: String? = nil, dec: Int? = nil) {
+		
+		self.exp = Base(dec ?? Self.decimalPlaces)
+		
+		
+		if var frc = fraction {
+			while frc.count != self.exp { frc.append("0") }
+			
+			if let val = Base(integer + frc) {
+				self.value = val
+				return
+			}
+			
+		} else {
+			
+			if let val = Base(integer) {
+				self.value = val * pow
+				return
+			}
+		}
+		
+		return nil
 	}
-
-
+	
+	
 	public init(raw: Base, dec: Int? = nil, over: String? = nil) {
 		
 		if let dec {
@@ -98,26 +104,6 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	}
 	
 
-	public init<T>(_ source: T, dec: Int? = nil) where T : BinaryInteger {
-		
-		if let dec {
-			self.exp = Base(dec)
-			self.pow = Self.raise(exp)
-		}
-		
-		let value = Base(source)
-		let (num, overflow) = value.multipliedReportingOverflow(by: pow)
-		
-		guard !overflow else { fatalError("Overflow: \(source) !") }
-		
-		self.value = num
-	}
-
-	
-	public init?<T>(exactly source: T) where T : BinaryInteger {
-		
-		self.init(integerLiteral: Base(source) )
-	}
 	
 	
 	public init(integerLiteral value: Int) {
@@ -126,22 +112,38 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 		guard !overflow else { fatalError("Overflow: \(value) !") }
 		
 		self.value = num
-		
 	}
+	
+	public init(_ value: Int) { self.init(integerLiteral: value) }
+	public init(_ value: Int8) { self.init(integerLiteral: Int(value)) }
+	public init(_ value: UInt8) { self.init(integerLiteral: Int(value)) }
+	public init(_ value: Int16) { self.init(integerLiteral: Int(value)) }
+	public init(_ value: UInt16) { self.init(integerLiteral: Int(value)) }
+	public init(_ value: Int32) { self.init(integerLiteral: Int(value)) }
+	public init(_ value: UInt32) { self.init(integerLiteral: Int(value)) }
+	
+	public init?<T>(exactly source: T) where T : BinaryInteger { self.init(integerLiteral: Base(source) ) }
+	
+	
+	
 	
 	
 	public init(floatLiteral value: Double) {
 		
 		let num = value * Double(pow)
-		guard num < Double(Base.max), value > Double(Base.min) else { fatalError("Overflow !") }
+		guard num < Double(Base.max), value > Double(Base.min) else { fatalError("Overflow: \(value) !") }
 		
 		self.value = Base(num)
 		
 	}
 	
-	public init(_ value: Double) {
-		self.init(floatLiteral: value)
-	}
+	public init(_ value: Double) { self.init(floatLiteral: value) }
+	
+	public init(_ value: Float) { self.init(floatLiteral: Double(value)) }
+	
+	
+	
+	
 	
 	/// int hosszúságát dinamikusra venni !
 	public init(stringLiteral value: String) {
@@ -153,8 +155,6 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 			self.value = (Int(integer) ?? 0) * pow
 			return
 		}
-		
-		
 		
 		let fraction = parts[1].prefix(exp)
 		
@@ -197,34 +197,33 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	}
 	
 	
-	public init?(integer: String, fraction: String? = nil, dec: Int? = nil) {
+
+	
+	
+	
+	// MARK: Encode-Decode
+	
+	
+	public func encode(to encoder: Encoder) throws {
 		
-		self.exp = Base(dec ?? Self.decimalPlaces)
+		var container = encoder.singleValueContainer()
+		try container.encode(value)
+	}
+	
+	
+	public init(from decoder: Decoder) throws {
 		
+		let value = try decoder.singleValueContainer()
 		
-		if var frc = fraction {
-			while frc.count != self.exp { frc.append("0") }
-			
-			if let val = Base(integer + frc) {
-				self.value = val
-				return
-			}
-			
-		} else {
-			
-			if let val = Base(integer) {
-				self.value = val * pow
-				return
-			}
-		}
-		
-		return nil
+		self.init()
+		self.value = try value.decode(Base.self)
 	}
 	
 	
 	
+	// MARK: Computed values
 	
-		// MARK:
+	
 	
 	public var description: String {
 //		guard over == nil else { return over! }
@@ -256,11 +255,11 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 			if let over {
 				string = sign + String(over) + "|" + whole
 			} else {
-			string = sign + whole
-		}
+				string = sign + whole
+			}
 		}
 
-//		while string.hasSuffix("0") { string.removeLast() }
+		while string.hasSuffix("0") { string.removeLast() }
 		
 		return string
 	}
@@ -335,7 +334,7 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	public mutating func negate() { self.value *= -1 }
 	
 		// + Addicion
-	public prefix static func + (x: FDec) -> FDec { x }
+//	public prefix static func + (x: FDec) -> FDec { x }
 	
 	public static func + (lhs: FDec, rhs: FDec) -> FDec {
 		
@@ -344,10 +343,6 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 		if overflow { print("Error >> Overflow!") }
 
 		return FDec(raw: value)
-		
-//		var sum = lhs.value + rhs.value
-//
-//		return FDec(raw: sum)
 		
 	}
 	
@@ -362,7 +357,7 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	
 	
 		// - Subtraction
-	public prefix static func - (x: FDec) -> FDec { var y = x ; y.value *= -1 ; return y }
+//	public prefix static func - (x: FDec) -> FDec { var y = x ; y.value *= -1 ; return y }
 	
 	public static func - (lhs: FDec, rhs: FDec) -> FDec {
 		
