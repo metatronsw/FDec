@@ -229,7 +229,7 @@ final class TestAritmetic: XCTestCase {
 	}
 	
 	
-	func testBasic_Add_Sub_RhsINT() throws {
+	func testBasic_Rhs_INT() throws {
 		
 		var a = T(1)
 		XCTAssertEqual( (a + 1), 2)
@@ -260,7 +260,23 @@ final class TestAritmetic: XCTestCase {
 		
 	}
 	
+	
+	func testBasic_Seq() throws {
+		
+		//		(-1.1) + (-2.2) - (-4.4) * (-3.1) / (-1.1) - (9.1)
+
+		var a = T(0)
+		a += T(-1.1)
+		a += T(-2.2)
+		a -= T(-4.4) * T(-3.1) / T(-1.1)
+		a -= T(9.1)
+		
+		XCTAssertEqual( a, 0)
+		
+	}
+	
 }
+
 
 final class Test_Random: XCTestCase {
 	
@@ -271,6 +287,7 @@ final class Test_Random: XCTestCase {
 			print( r, r?.digitCount )
 		}
 	}
+	
 	
 	func test_validator() throws {
 		
