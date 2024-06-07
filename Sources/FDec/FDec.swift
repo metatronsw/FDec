@@ -343,7 +343,7 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	
 	
 	private static func overFlow(_ str: String? = nil, sender: String = #function ) {
-		fatalError("Overflow: \(str ?? "") from \(sender)")
+		fatalError("Overflow: \(str ?? "") #\(str?.count ?? 0)  from \(sender)")
 	}
 	
 	
