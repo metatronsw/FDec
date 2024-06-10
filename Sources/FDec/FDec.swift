@@ -35,6 +35,12 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	}
 	
 	
+	public init(_ F: FDec) {
+		self.value = F.value
+		self.pow = F.pow
+	}
+	
+	
 	public init?(integer: String, fraction: String? = nil, dec: Int = Self.decimalsNum) {
 		
 		self.pow = dec.raise
@@ -58,6 +64,7 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 		
 		return nil
 	}
+	
 	
 	
 	/// Quick initialization with an integer number already prepared. Be careful, there is no limit to the value of decimals, above 15 it will be unusable...
