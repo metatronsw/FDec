@@ -35,7 +35,8 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	}
 	
 	
-	public init(_ F: FDec) {
+	public init?(_ F: FDec) { // TODO: megoldani hogy közös nevezőre hozza őket ...
+		guard F.pow == Self.decimalsNum.raise else { return nil }
 		self.value = F.value
 		self.pow = F.pow
 	}

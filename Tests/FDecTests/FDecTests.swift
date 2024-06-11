@@ -102,6 +102,20 @@ final class Test_Init: XCTestCase {
 		
 	}
 	
+	func test_Init_Self()  throws {
+		
+		FDec.decimalsNum = 3
+		
+		let a = T("111.001")
+		
+		FDec.decimalsNum = 2
+		
+		let b = T("222.01")
+		
+		let c = T(a)
+		print(a,b, c)
+	}
+	
 }
 
 
