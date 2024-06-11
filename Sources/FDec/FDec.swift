@@ -110,7 +110,7 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	public init(_ value: Float) { self.init(floatLiteral: Double(value)) }
 	
 	
-	
+	// TODO: Throw kell ide ...
 	public init(stringLiteral value: String) {
 		
 		self.init()
@@ -121,7 +121,7 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 		guard integer.count < 15 else { Self.overFlow(value) ; return }
 		
 		guard parts.count > 1 else {
-			guard let int = Int(integer) else { Self.overFlow("Int cast") ; return }
+			guard let int = Int(integer) else { Self.overFlow("Int cast failed from: \(value) › \(integer)") ; return }
 			self.init(integerLiteral: int)
 			return
 		}
@@ -130,7 +130,7 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 		
 		let whole = String(integer + fraction) + String(repeating: "0", count: Self.decimalsNum - fraction.count )
 		
-		guard let raw = Int(whole) else { Self.overFlow("Int cast") ; return }
+		guard let raw = Int(whole) else { Self.overFlow("Fraction Int cast failed from: \(value) › \(whole)") ; return }
 		
 		self.init(raw: raw)
 		
