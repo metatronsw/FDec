@@ -24,7 +24,7 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	
 	/// Static variable that defines the maximum decimal numbers at the Structural level.
 	///
-	public static var decimalsNum: Int = 4
+	public static var decimalsNum: Int = 3
 	
 	///The value actually stored.
 	///
