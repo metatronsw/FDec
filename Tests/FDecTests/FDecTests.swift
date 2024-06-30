@@ -8,7 +8,6 @@ final class Test_Init: XCTestCase {
 	
 	func test_Init_Literal_Int() throws {
 		
-		
 		XCTAssertEqual( T(0), 0)
 		XCTAssertEqual( T(integerLiteral: 0), 0)
 		
@@ -96,11 +95,8 @@ final class Test_Init: XCTestCase {
 		XCTAssertEqual( T(Double(10.1)), 10.1)
 		XCTAssertEqual( T(Double(11.222)), 11.222)
 		XCTAssertEqual( T(Double(12345.33333)), 12345.33333)
-//		XCTAssertEqual( T(Double(123456789012345.123456789)), 123456789012345.123456789)
-		
-//		XCTAssertEqual( T(Double(Int.max)), 123456789012345.123456789)
-		
 	}
+	
 	
 	func test_Init_Self()  throws {
 		
@@ -113,7 +109,8 @@ final class Test_Init: XCTestCase {
 		let b = T("222.01")
 		
 		let c = T(a)
-		print(a,b, c)
+
+		XCTAssertEqual( c, a ) // Not ! 
 	}
 	
 }
@@ -201,8 +198,7 @@ final class TestAritmetic: XCTestCase {
 		let b = T(2)
 		
 		XCTAssertEqual( a + b,  3)
-		XCTAssertEqual( a + (-b),  -1)
-		
+		XCTAssertEqual( a + (-b),  -1)		
 	}
 	
 	
@@ -277,7 +273,7 @@ final class TestAritmetic: XCTestCase {
 	
 	func testBasic_Seq() throws {
 		
-		//		(-1.1) + (-2.2) - (-4.4) * (-3.1) / (-1.1) - (9.1)
+		// (-1.1) + (-2.2) - (-4.4) * (-3.1) / (-1.1) - (9.1)
 
 		var a = T(0)
 		a += T(-1.1)
@@ -326,7 +322,7 @@ final class Test_Random: XCTestCase {
 			XCTAssertEqual( (x1 + x2).description, (y1 + y2).description)
 			XCTAssertEqual( (x1 - x2).description, (y1 - y2).description)
 			XCTAssertEqual( (x1 * x2).description, (y1 * y2).description)
-			//			XCTAssertEqual( (x1 / x2).asDouble.round().description , String(numberFormatter.string(from: (y1 / y2) as NSNumber)!.dropLast(2) ))
+			// XCTAssertEqual( (x1 / x2).asDouble.round().description , String(numberFormatter.string(from: (y1 / y2) as NSNumber)!.dropLast(2) ))
 		}
 		
 	}
