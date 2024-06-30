@@ -13,6 +13,9 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	public typealias StringLiteralType = String
 	public typealias FloatLiteralType = Double
 	
+	
+	/// Helper numbers, for quick internal operations
+	///
 	private static let half: Int =             1_000_000_000
 	private static let high: Int =       100_000_000_000_000
 	private static let full: Int = 1_000_000_000_000_000_000
@@ -20,9 +23,15 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	
 	
 	/// Static variable that defines the maximum decimal numbers at the Structural level.
+	///
 	public static var decimalsNum: Int = 4
 	
+	///The value actually stored.
+	///
 	private(set) var value: Int
+	
+	/// Internal value set at initialisation, helps fast operations, not saved at serialisation.
+	///
 	private(set) var pow: Int
 	
 	
