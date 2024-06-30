@@ -96,10 +96,6 @@ final class Test_Init: XCTestCase {
 		XCTAssertEqual( T(Double(10.1)), 10.1)
 		XCTAssertEqual( T(Double(11.222)), 11.222)
 		XCTAssertEqual( T(Double(12345.33333)), 12345.33333)
-//		XCTAssertEqual( T(Double(123456789012345.123456789)), 123456789012345.123456789)
-		
-//		XCTAssertEqual( T(Double(Int.max)), 123456789012345.123456789)
-		
 	}
 	
 	func test_Init_Self()  throws {
