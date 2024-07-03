@@ -440,6 +440,8 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 		if frc == "0000" { return string }
 		frc.dropLastZeros()
 		
+		
+		if frc.isEmpty { return string }
 		return string + decimalSep + frc
 		
 		
