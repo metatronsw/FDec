@@ -36,6 +36,7 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	
 	
 	
+	
 	// MARK: Init
 	
 	public init() {
@@ -213,6 +214,8 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	}
 	
 	public var decimalPlaces: Int { String(self.pow).count - 1 }
+	
+	public var rawValue: Int { value }
 	
 	public var asInt: Int { value / pow }
 	
