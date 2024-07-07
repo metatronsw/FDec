@@ -97,7 +97,6 @@ final class Test_Init: XCTestCase {
 		XCTAssertEqual( T(Double(12345.33333)), 12345.33333)
 	}
 	
-	
 	func test_Init_Self()  throws {
 		
 		FDec.decimalsNum = 3
@@ -114,6 +113,7 @@ final class Test_Init: XCTestCase {
 	}
 	
 }
+
 
 
 final class TestOutput: XCTestCase {
@@ -158,6 +158,7 @@ final class TestOutput: XCTestCase {
 }
 
 
+
 final class TestAritmetic: XCTestCase {
 	
 	func testBasic_INT_Add_Sub() throws{
@@ -191,7 +192,6 @@ final class TestAritmetic: XCTestCase {
 		
 	}
 	
-	
 	func testBasic_Negate() throws {
 		
 		let a = T(1)
@@ -200,7 +200,6 @@ final class TestAritmetic: XCTestCase {
 		XCTAssertEqual( a + b,  3)
 		XCTAssertEqual( a + (-b),  -1)		
 	}
-	
 	
 	func testBasic_FRC_Add() throws {
 		
@@ -219,7 +218,6 @@ final class TestAritmetic: XCTestCase {
 		XCTAssertEqual( T(0.99) + T(0.02),  "1.01")
 	}
 	
-	
 	func testBasic_FRC_Sub() throws {
 		
 		XCTAssertEqual( T(0) - T(0.0), "0")
@@ -237,7 +235,6 @@ final class TestAritmetic: XCTestCase {
 		XCTAssertEqual( T(0.01) - T(0.91),  "-0.9")
 		
 	}
-	
 	
 	func testBasic_Rhs_INT() throws {
 		
@@ -270,7 +267,6 @@ final class TestAritmetic: XCTestCase {
 		
 	}
 	
-	
 	func testBasic_Seq() throws {
 		
 		// (-1.1) + (-2.2) - (-4.4) * (-3.1) / (-1.1) - (9.1)
@@ -288,8 +284,8 @@ final class TestAritmetic: XCTestCase {
 }
 
 
+
 final class Test_Random: XCTestCase {
-	
 	
 	func test_RandomNumGen() throws {
 		for _ in 0...100 {
@@ -297,7 +293,6 @@ final class Test_Random: XCTestCase {
 			print( r, r?.digitCount )
 		}
 	}
-	
 	
 	func test_validator() throws {
 		
