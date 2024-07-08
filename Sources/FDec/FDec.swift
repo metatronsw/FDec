@@ -459,9 +459,9 @@ extension String {
 }
 
 
-extension Int {
+fileprivate extension Int {
 	
-	internal var raise: Int {
+	 var raise: Int {
 		switch self {
 			case 0:  return 1
 			case 1:  return 10
