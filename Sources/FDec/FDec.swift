@@ -25,6 +25,7 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	/// Static variable that defines the maximum decimal numbers at the Structural level.
 	///
 	public static var decimalsNum: Int = 3
+	public static var zeroShift = String(repeating: "0", count: Self.decimalsNum)
 	
 	///The value actually stored.
 	///
@@ -151,7 +152,11 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	public init?(_ value: String) { self.init(stringLiteral: value) }
 	
 	
-	
+	public init(fastString intPart: String) {
+		
+		self.value = Int(intPart + Self.zeroShift)!
+		self.pow = Self.decimalsNum.raise
+	}
 	
 	
 	
