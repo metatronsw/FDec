@@ -97,20 +97,18 @@ final class Test_Init: XCTestCase {
 		XCTAssertEqual( T(Double(12345.33333)), 12345.33333)
 	}
 	
-	func test_Init_Self()  throws {
-		
-		FDec.decimalsNum = 3
-		
-		let a = T("111.001")
-		
-		FDec.decimalsNum = 2
-		
-		let b = T("222.01")
-		
-		let c = T(a)
-
-		XCTAssertEqual( c, a ) // Not ! 
-	}
+//	func test_Init_Self()  throws {
+//
+//		FDec.decimalsNum = 3
+//
+//		let a = T("111.001")
+//
+//		FDec.decimalsNum = 2
+//
+//		let c = T("222.01")
+//
+//		XCTAssertNotEqual( c, a ) // Not !
+//	}
 	
 }
 

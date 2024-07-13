@@ -24,7 +24,7 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	
 	/// Static variable that defines the maximum decimal numbers at the Structural level.
 	///
-	public static var decimalsNum: Int = 3
+	public static var decimalsNum: Int = 4
 	public static var zeroShift = String(repeating: "0", count: Self.decimalsNum)
 	
 	///The value actually stored.
@@ -442,14 +442,10 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 			index += 1
 		}
 		
-		if frc == "0000" { return string }
 		frc.dropLastZeros()
-		
 		
 		if frc.isEmpty { return string }
 		return string + decimalSep + frc
-		
-		
 	}
 	
 	
@@ -457,7 +453,6 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 
 
 extension String {
-	
 	internal mutating func dropLastZeros()  {
 		while self.hasSuffix("0") { self.removeLast() }
 	}
@@ -465,7 +460,6 @@ extension String {
 
 
 fileprivate extension Int {
-	
 	 var raise: Int {
 		switch self {
 			case 0:  return 1
@@ -485,10 +479,9 @@ fileprivate extension Int {
 			case 14: return 100000000000000
 			case 15: return 1000000000000000
 			case 16: return 10000000000000000
-			case 18: return 100000000000000000
-			case 19: return 1000000000000000000
-			default: return 1
+			case 17: return 100000000000000000
+			case 18: return 1000000000000000000
+			default: fatalError()
 		}
 	}
-	
 }
