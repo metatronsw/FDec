@@ -401,7 +401,7 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	public func max(_ x: FDec, _ y: FDec ) -> FDec { (x > y) ? x: y }
 
 	
-	
+	//TODO: Átnézni hogy gyorsabb legyen ...
 	public func getFormated(showSign: Bool = true, groupingSize: Int = 3, decimalSeparator: String? = nil, groupingSeparator: String? = nil) -> String {
 		
 		guard value != 0 else { return "0" }
