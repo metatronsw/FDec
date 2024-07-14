@@ -25,6 +25,7 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	/// Static variable that defines the maximum decimal numbers at the Structural level.
 	///
 	public static var decimalsNum: Int = 4
+	public static var decimalPow = decimalsNum.raise // TODO: TOTÁL SZAR ! megcsinálni már végre rendesen ... hogy ne akadjanak össze és ne legyen külön tárolva a pow
 	public static var zeroShift = String(repeating: "0", count: Self.decimalsNum)
 	
 	///The value actually stored.
@@ -42,7 +43,7 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	
 	public init() {
 		self.value = 0
-		self.pow = Self.decimalsNum.raise
+		self.pow = Self.decimalPow
 	}
 	
 	
@@ -53,32 +54,47 @@ public struct FDec: SignedNumeric, ExpressibleByFloatLiteral, ExpressibleByStrin
 	}
 	
 	
-	public init?(integer: String, fraction: String? = nil, dec: Int = Self.decimalsNum) {
+//	public init?(integer: String, fraction: String? = nil) {
+//
+//		self.pow = Self.decimalPow
+//
+//		if var fraction {
+//			if fraction.count > Self.decimalsNum { fraction = String(fraction.suffix(Self.decimalsNum)) }
+//			while fraction.count < Self.decimalsNum { fraction.append("0") }
+//
+//			if let raw = Int(integer + fraction) {
+//				self.value = raw
+//				print(integer, fraction, value)
+//				return
+//			}
+//
+//		} else {
+//
+//			if let int = Int(integer) {
+//				self.value = int * self.pow
+//				return
+//			}
+//		}
+//
+//		return nil
+//	}
+	
+	public init?(intStr: String, frcStr: String = zeroShift, negative: Bool) {
 		
-		self.pow = dec.raise
-		let dp = String(self.pow).count - 1
+		self.pow = Self.decimalPow
 		
-		if var fraction {
-			while fraction.count != dp { fraction.append("0") }
-			
-			if let raw = Int(integer + fraction) {
-				self.value = raw
-				return
-			}
-			
-		} else {
-			
-			if let int = Int(integer) {
-				self.value = int * self.pow
-				return
-			}
-		}
+		var frcStr = frcStr
 		
-		return nil
+		if frcStr.count > Self.decimalsNum { frcStr = String(frcStr.suffix(Self.decimalsNum)) }
+		while frcStr.count < Self.decimalsNum { frcStr.append("0") }
+		
+		guard let raw = Int(intStr + frcStr) else { return nil }
+		self.value = raw
 	}
 	
-	
-	
+
+
+
 	/// Quick initialization with an integer number already prepared. Be careful, there is no limit to the value of decimals, above 15 it will be unusable...
 	public init(raw: Int, decimals: Int = Self.decimalsNum) {
 		self.value = raw
