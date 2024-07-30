@@ -4,7 +4,7 @@ import XCTest
 typealias T = FDec
 
 
-final class Test_Init: XCTestCase {
+final class Test_Common: XCTestCase {
 	
 	func test_Init_Int() throws {
 		
@@ -187,9 +187,6 @@ final class Test_Init: XCTestCase {
 }
 
 
-
-
-
 final class Test_Aritmetic: XCTestCase {
 
 	func test_Negate() throws {
@@ -324,14 +321,46 @@ final class Test_Aritmetic: XCTestCase {
 
 		// (-1.1) + (-2.2) - (-4.4) * (-3.1) / (-1.1) - (9.1)
 
-		var a = T(0)
+		var a: T
+		
+		a = T(0)
 		a += T(-1.1)
 		a += T(-2.2)
 		a -= T(-4.4) * T(-3.1) / T(-1.1)
 		a -= T(9.1)
-
 		XCTAssertEqual( a, 0)
+		
+	}
+	
+	
+	func test_Random() throws {
+	
+		for _ in 0...1000 {
+			
+		let rA = Int16.random(in: 0...Int16.max)
+		let rB = Int16.random(in: 0...Int16.max)
+		let rX = Int16.random(in: 0...9999)
+		let rY = Int16.random(in: 0...9999)
+		
+		let floatA = String(rA) + "." + String(rX)
+		let floatB = String(rB) + "." + String(rY)
+		
+		let sdecA = Decimal(string: floatA)!
+		let sdecB = Decimal(string: floatB)!
+		
+		let fdecA = FDec(stringLiteral: floatA)
+		let fdecB = FDec(stringLiteral: floatB)
+		
+		XCTAssertEqual( (fdecA + fdecB).description, (sdecA + sdecB).description )
+		XCTAssertEqual( (fdecA - fdecB).description, (sdecA - sdecB).description )
+		
+		let mul = (fdecA * fdecB).description
+		XCTAssertEqual( mul, String((sdecA * sdecB).description.prefix(mul.count) ))
 
+		let div = (fdecA / fdecB).description
+		XCTAssertEqual( div, String((sdecA / sdecB).description.prefix(div.count) ))
+		
+		}
 	}
 
 }

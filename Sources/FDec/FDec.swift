@@ -3,6 +3,16 @@
 //  (  __)(    \ (  __) / __)
 //   ) _)  ) D (  ) _) ( (__   Mtrn (C)
 //  (__)  (____/ (____) \___)  2023.07.30.
+//
+//  https://github.com/metatronsw/FDec.git
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
 
 import Foundation
 
@@ -16,6 +26,7 @@ public struct FDec {
 	/// The value actually shifted & stored inernaly
 	private(set) var value: FBase
 	
+	/// Shifted & stored internal value { get }
 	public var rawValue: FBase { self.value }
 
 	
@@ -32,8 +43,6 @@ public struct FDec {
 	public static var intMaxDecimals = 19 - fractNum
 	
 	
-	
-	
 	/// Helper numbers, for quick internal operations
 	private static let half: FBase =             1_000_000_000
 	private static let high: FBase =       100_000_000_000_000
@@ -42,6 +51,7 @@ public struct FDec {
 	
 	public static let zero = FDec()
 	public static let infinity = FDec(raw: FBase.max)
+	
 	
 	private mutating func overflow() {
 		self.value = FBase.max
@@ -383,7 +393,11 @@ extension FDec: SignedNumeric {
 	
 	public static func / (lhs: FDec, rhs: FDec) -> FDec {
 		
-		return FDec(raw: (lhs.value * Self.pow) / (rhs.value) )
+		let (raw, over) = lhs.value.multipliedReportingOverflow(by: Self.pow)
+		
+		guard !over else { return .infinity }
+		
+		return FDec(raw: raw / (rhs.value) )
 	}
 	
 	public static func /= (lhs: inout FDec, rhs: FDec) { lhs = lhs / rhs }
@@ -395,7 +409,11 @@ extension FDec: SignedNumeric {
 	
 	public static func % (lhs: FDec, rhs: FDec) -> FDec {
 		
-		return FDec(raw: (lhs.value * Self.pow) % (rhs.value) )
+		let (raw, over) = lhs.value.multipliedReportingOverflow(by: Self.pow)
+		
+		guard !over else { return .infinity }
+		
+		return FDec(raw: raw % (rhs.value) )
 	}
 	
 	
