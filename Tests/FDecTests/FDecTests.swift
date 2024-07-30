@@ -6,70 +6,78 @@ typealias T = FDec
 
 final class Test_Init: XCTestCase {
 	
-	func test_Init_Literal_Int() throws {
+	func test_Init_Int() throws {
 		
-		XCTAssertEqual( T(0), 0)
+		
 		XCTAssertEqual( T(integerLiteral: 0), 0)
-		
-		XCTAssertEqual( T(12345),   12345 )
 		XCTAssertEqual( T(integerLiteral: 12345), 12345)
-		
-		XCTAssertEqual( T(-12345),   -12345 )
 		XCTAssertEqual( T(integerLiteral: -12345), -12345)
-
-		XCTAssertEqual( T(1_000), 1000)
-		XCTAssertEqual( T(integerLiteral: 1_000), 1000)
-
-	}
-	
-	func test_Init_Literal_Float() throws {
 		
-		XCTAssertEqual( T(0.1),    0.1 )
-		XCTAssertEqual( T(-0.1),  -0.1 )
-		XCTAssertEqual( T(0.001),   0.001)
-		XCTAssertEqual( T(-0.001), -0.001)
-		
-		XCTAssertEqual( T(32.12),    32.12 )
-		XCTAssertEqual( T(-32.12),  -32.12 )
-		
-		XCTAssertEqual( T(12345.6789),   12345.6789 )
-		XCTAssertEqual( T(-12345.6789), -12345.6789 )
-		
-	}
-	
-	func test_Init_Integer() throws {
-		
-		var int: Int
-		
-		int = 0
-		XCTAssertEqual( T(int), 0)
-		
-		int = -0
-		XCTAssertEqual( T(int), 0)
-		
-		int = 12345
-		XCTAssertEqual( T(int),  12345 )
-		
-		int = -12345
-		XCTAssertEqual( T(int), -12345 )
 		
 		XCTAssertEqual( T(UInt8.max),   255 )
+		XCTAssertEqual( T(UInt8.min),     0 )
+		XCTAssertEqual( T(Int8.max),    127 )
 		XCTAssertEqual( T(Int8.min),   -128 )
 		
 		XCTAssertEqual( T(UInt16.max),  65535 )
+		XCTAssertEqual( T(UInt16.min),      0 )
+		XCTAssertEqual( T(Int16.max),   32767 )
 		XCTAssertEqual( T(Int16.min),  -32768 )
 		
-		XCTAssertEqual( T(UInt32.max),  4294967295 )
+		XCTAssertEqual( T(Int32.max),   2147483647 )
 		XCTAssertEqual( T(Int32.min),  -2147483648 )
 		
+		let intMin = UInt.min
+		XCTAssertEqual( T(intMin),  0 )
+		
+		print(Int.max)
+		print(Int.min)
+		print(UInt.min)
+		print(UInt.min)
+		
+		let int = 100_000_000_000_000
+		XCTAssertEqual( T(int)!.asInt,  int )
+		
+		let intBig = 900_000_000_000_000_000
+		XCTAssertNil( T(intBig) )
+		
+		
 	}
+	
+	
+	func test_Init_Double() throws {
+
+		XCTAssertEqual( T(0), 0.0)
+		XCTAssertEqual( T(1), 1.0)
+		XCTAssertEqual( T(10), 10.0)
+		
+		XCTAssertEqual( T(1.0), 1.0)
+		XCTAssertEqual( T(0.1), 0.1)
+		XCTAssertEqual( T(10.1), 10.1)
+		XCTAssertEqual( T(11.222), 11.222)
+		XCTAssertEqual( T(12345.3333), 12345.3333)
+		
+		XCTAssertEqual( T(12345.3333).asDouble, 12345.3333)
+		
+		let double = 1234567890.1234
+		XCTAssertEqual( T(double)!.asDouble, 1234567890.1234)
+		
+		let long = 1234567890.1234567
+		XCTAssertNil( T(long) )
+		
+		XCTAssertEqual( T(truncating: long), 1234567890.1234)
+		
+	}
+	
 	
 	func test_Init_String() throws {
 		
 		XCTAssertEqual( T("0"),  "0")
 		XCTAssertEqual( T("-0"), "0")
-		XCTAssertEqual( T("-0").isNegative, false)
-		XCTAssertEqual( T("-1").isNegative, true)
+		
+		XCTAssertFalse( T("0").isNegative)
+		XCTAssertFalse( T("-0").isNegative)
+		XCTAssertTrue(  T("-1").isNegative)
 		
 		XCTAssertEqual( T("1235"),   "1235")
 		XCTAssertEqual( T("-1235"), "-1235")
@@ -78,45 +86,52 @@ final class Test_Init: XCTestCase {
 		XCTAssertEqual( T("1000_000"), "1000000")
 		XCTAssertEqual( T("1_000_000"), "1000000")
 		
-		XCTAssertEqual( T("0.1"),   "0.1")
+		XCTAssertEqual( T("0.1"), "0.1")
 		XCTAssertEqual( T("-0.1"), "-0.1")
 		XCTAssertEqual( T("-0.001"), "-0.001")
 		XCTAssertEqual( T("12345.6789"),   "12345.6789")
 		XCTAssertEqual( T("-12345.6789"), "-12345.6789")
 		
-	}
-	
-	func test_Init_Double() throws {
+		let strFail = "habakuk"
+		XCTAssertNil( T(strFail) )
 		
-		XCTAssertEqual( T(Double(1)), 1.0)
-		XCTAssertEqual( T(Double(1)), 1.0)
-		XCTAssertEqual( T(Double(10)), 10.0)
-		XCTAssertEqual( T(Double(0.1)), 0.1)
-		XCTAssertEqual( T(Double(10.1)), 10.1)
-		XCTAssertEqual( T(Double(11.222)), 11.222)
-		XCTAssertEqual( T(Double(12345.33333)), 12345.33333)
+		let short = "123456789.0123"
+		XCTAssertEqual( T(short)!.description, short )
+		
+		let long = "1234567890123456789.01234"
+		XCTAssertNil( T(long) )
+		
+		let strUnderscore = "123_456_789"
+		XCTAssertNil( T(strUnderscore)?.description, "123456789")
+		XCTAssertEqual( T(stringLiteral: strUnderscore).description, "123456789")
+		XCTAssertEqual( T("123456789").asInt, 123456789)
+		
+		let strUnderscoreAndFrc = "123_456_789.123"
+		XCTAssertEqual( T(stringLiteral: strUnderscoreAndFrc).description, "123456789.123")
+		
+		XCTAssertEqual( T(int: "12345", sign: "-"), -12345 )
+		XCTAssertEqual( T(int: "12345", frc: "678", sign: "-"), "-12345.678" )
+		
 	}
 	
-//	func test_Init_Self()  throws {
-//
-//		FDec.decimalsNum = 3
-//
-//		let a = T("111.001")
-//
-//		FDec.decimalsNum = 2
-//
-//		let c = T("222.01")
-//
-//		XCTAssertNotEqual( c, a ) // Not !
-//	}
 	
-}
+	func test_Init_Self()  throws {
 
+		FDec.fractNum = 3
+		let a = T("111.001")
 
+		FDec.fractNum = 4
+		let b = T("222.1234")
+		
+		let c = T("111.001")
 
-final class TestOutput: XCTestCase {
+		XCTAssertNotEqual( a, b )
+		XCTAssertNotEqual( a, c )
+		
+	}
 	
-	func testOutput_String() throws {
+	
+	func test_Output_String() throws {
 		
 		XCTAssertEqual( T(0), "0")
 		XCTAssertEqual( T(0).description, "0")
@@ -131,12 +146,12 @@ final class TestOutput: XCTestCase {
 		
 	}
 	
-	func testOutput_Formatted() throws {
+	
+	func test_Output_Formatted() throws {
 		
 		XCTAssertEqual( T(0).formatted(), "0")
 		XCTAssertEqual( T(1_000).formatted(), "1 000")
 		XCTAssertEqual( T(1_000_000).formatted(), "1 000 000")
-		XCTAssertEqual( T(922_337_203_685_475).formatted(), "922 337 203 685 475")
 		
 		XCTAssertEqual( T("1_000.1").formatted(),   "1 000.1")
 		XCTAssertEqual( T("1_000.001").formatted(), "1 000.001")
@@ -144,22 +159,50 @@ final class TestOutput: XCTestCase {
 		
 	}
 	
-	func testCasting_Double() throws {
+	
+	func test_Casting_Int() throws {
 		
-		XCTAssertEqual( (T("0").asDouble),   0.0 )
-		XCTAssertEqual( (T("1").asDouble),   1.0 )
-		XCTAssertEqual( (T("0.001").asDouble),   0.001 )
-		XCTAssertEqual( (T("-0.001").asDouble), -0.001 )
+		XCTAssertEqual( T("0").asInt,   0 )
+		XCTAssertEqual( T("1").asInt,   1 )
+		XCTAssertEqual( T("1111").asInt,   1111 )
+		XCTAssertEqual( T("-0.001").asInt, 0 )
+		XCTAssertEqual( T("12345.6789").asInt,   12345)
+		XCTAssertEqual( T("-12345.6789").asInt, -12345)
+		
+		
+	}
+	
+	
+	func test_Casting_Double() throws {
+		
+		XCTAssertEqual( T("0").asDouble,   0.0 )
+		XCTAssertEqual( T("1").asDouble,   1.0 )
+		XCTAssertEqual( T("0.001").asDouble,   0.001 )
+		XCTAssertEqual( T("-0.001").asDouble, -0.001 )
 		XCTAssertEqual( T("12345.6789").asDouble,   12345.6789)
 		XCTAssertEqual( T("-12345.6789").asDouble, -12345.6789)
+		
 	}
+	
 }
 
 
 
-final class TestAritmetic: XCTestCase {
+
+
+final class Test_Aritmetic: XCTestCase {
+
+	func test_Negate() throws {
+
+		let a = T(1)
+		let b = T(2)
+
+		XCTAssertEqual( a + b,  3)
+		XCTAssertEqual( a + (-b),  -1)
+	}
 	
-	func testBasic_INT_Add_Sub() throws{
+	
+	func test_Integer_Add_Sub() throws {
 		
 		XCTAssertEqual( T(0) + T(0),  0)
 		XCTAssertEqual( T(0) + T(1),  1)
@@ -189,84 +232,96 @@ final class TestAritmetic: XCTestCase {
 		XCTAssertEqual( T(-3) - T(-4),  1)
 		
 	}
+
 	
-	func testBasic_Negate() throws {
+	func test_Integer_Mul_Div() throws {
 		
-		let a = T(1)
-		let b = T(2)
+		XCTAssertEqual( T(0) * T(1), 0)
+		XCTAssertEqual( T(3) * T(1), 3)
 		
-		XCTAssertEqual( a + b,  3)
-		XCTAssertEqual( a + (-b),  -1)		
+		XCTAssertEqual( T(3) * T(3), 9)
+		XCTAssertEqual( T(3) * T(-3), -9)
+		
+		XCTAssertEqual( T(0) / T(1), 0)
+		
+		XCTAssertEqual( T(9) / T(3), 3)
+		XCTAssertEqual( T(9) / T(-3), -3)
+		
 	}
 	
-	func testBasic_FRC_Add() throws {
-		
+	
+	func test_Fraction_Add() throws {
+
 		XCTAssertEqual( T(0) + T(0.0), "0")
 		XCTAssertEqual( T(0) + T(0.1), "0.1")
-		
+
 		XCTAssertEqual( T(0.1) + T(0.1),  "0.2")
 		XCTAssertEqual( T(0.1) + T(0.02), "0.12")
 		XCTAssertEqual( T(0.1) + T(0.9),  "1")
 		XCTAssertEqual( T(0.1) + T(0.91), "1.01")
-		
-		
+
+
 		XCTAssertEqual( T(0.0001) + T(0.1), "0.1001")
-		
+
 		XCTAssertEqual( T(0.99) + T(0.01),  "1")
 		XCTAssertEqual( T(0.99) + T(0.02),  "1.01")
 	}
+
 	
-	func testBasic_FRC_Sub() throws {
-		
+	func test_Fraction_Sub() throws {
+
 		XCTAssertEqual( T(0) - T(0.0), "0")
 		XCTAssertEqual( T(0) - T(0.1), "-0.1")
-		
+
 		XCTAssertEqual( T(0.1) + T(0.1),  "0.2")
 		XCTAssertEqual( T(0.1) + T(0.02), "0.12")
 		XCTAssertEqual( T(0.1) + T(0.9),  "1")
 		XCTAssertEqual( T(0.1) + T(0.91), "1.01")
-		
-		
+
+
 		XCTAssertEqual( T(0.01) - T(0.002),  "0.008")
 		XCTAssertEqual( T(0.01) - T(0.002),  "0.008")
 		XCTAssertEqual( T(0.1) - T(0.91),  "-0.81")
 		XCTAssertEqual( T(0.01) - T(0.91),  "-0.9")
+
+	}
+
+
+	func test_Fraction_Mul() throws {
+		
+		XCTAssertEqual( T(1.5) * T(2), 3)
+		XCTAssertEqual( T(1.5) * T(1.5), 2.25)
+		XCTAssertEqual( T(10) * T(0.5), 5)
+		XCTAssertEqual( T(0.1) * T(10), 1)
+		XCTAssertEqual( T(0.0001) * T(10000), 1)
 		
 	}
 	
-	func testBasic_Rhs_INT() throws {
+	
+	func test_Fraction_Div() throws {
 		
-		var a = T(1)
-		XCTAssertEqual( (a + 1), 2)
-		XCTAssertEqual( (a + 99), 100)
-		XCTAssertEqual( (a - 1), 0)
-		XCTAssertEqual( (a - 2), -1)
-		XCTAssertEqual( (a - 100), -99)
+		XCTAssertEqual( T(3) / T(2), 1.5)
+		XCTAssertEqual( T(4) / T(3), 1.3333)
 		
-		a += 1
-		XCTAssertEqual( a.description, "2")
+		XCTAssertEqual( T(3) / T(1.5), 2)
+		XCTAssertEqual( T(2.5) / T(1.5), 1.6666)
 		
-		a -= 3
-		XCTAssertEqual( a.description, "-1")
-		
-		a += 5
-		XCTAssertEqual( a.description, "4")
-		
-		a += (-1)
-		XCTAssertEqual( a.description, "3")
-		
-		
-		
-		let b = T(-1)
-		XCTAssertEqual( (b + 1), 0)
-		XCTAssertEqual( (b + 2), 1)
-		XCTAssertEqual( (b - 1), -2)
-		XCTAssertEqual( (b - (-2) ), 1)
+		XCTAssertEqual( T(2.5) / T(1.1), 2.2727)
+		XCTAssertEqual( T(10) / T(0.5), 20)
 		
 	}
 	
-	func testBasic_Seq() throws {
+	
+	func test_Fraction_Mod() throws {
 		
+		XCTAssertEqual( T(4) % T(3), 1)
+		XCTAssertEqual( T(8) % T(2), 0)
+		
+	}
+	
+	
+	func test_Sequence() throws {
+
 		// (-1.1) + (-2.2) - (-4.4) * (-3.1) / (-1.1) - (9.1)
 
 		var a = T(0)
@@ -274,52 +329,13 @@ final class TestAritmetic: XCTestCase {
 		a += T(-2.2)
 		a -= T(-4.4) * T(-3.1) / T(-1.1)
 		a -= T(9.1)
-		
+
 		XCTAssertEqual( a, 0)
-		
+
 	}
-	
+
 }
 
 
-
-final class Test_Random: XCTestCase {
-	
-	func test_RandomNumGen() throws {
-		for _ in 0...100 {
-			let r = T.random(0...100000, 1000...9000)
-			print( r, r?.digitCount )
-		}
-	}
-	
-	func test_validator() throws {
-		
-		let numberFormatter = NumberFormatter()
-		numberFormatter.numberStyle = .decimal
-		numberFormatter.maximumFractionDigits = 6
-		numberFormatter.decimalSeparator = "."
-		numberFormatter.minimumFractionDigits = 6
-		numberFormatter.roundingMode = .down
-		
-		for _ in 0...100 {
-			
-			let r1 = Int.random(in: -922_337...922_337)
-			let r2 = Int.random(in: -922_337...922_337)
-			
-			let x1 = T(r1)
-			let x2 = T(r2)
-			
-			let y1 = Decimal(r1)
-			let y2 = Decimal(r2)
-			
-			XCTAssertEqual( (x1 + x2).description, (y1 + y2).description)
-			XCTAssertEqual( (x1 - x2).description, (y1 - y2).description)
-			XCTAssertEqual( (x1 * x2).description, (y1 * y2).description)
-			// XCTAssertEqual( (x1 / x2).asDouble.round().description , String(numberFormatter.string(from: (y1 / y2) as NSNumber)!.dropLast(2) ))
-		}
-		
-	}
-	
-}
 
 
