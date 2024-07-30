@@ -511,6 +511,20 @@ extension FDec: Codable {
 
 
 
+ 
+extension FDec {
+	
+	public func sqrt() -> FDec {
+		let root = Darwin.sqrt(self.asDouble)
+		return FDec(truncating: root)
+	}
+	
+}
+
+func sqrt(_ value: FDec) -> FDec { value.sqrt() }
+
+
+
 
 fileprivate extension Int {
 	
@@ -549,3 +563,4 @@ fileprivate extension String {
 	}
 	
 }
+

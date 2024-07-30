@@ -363,6 +363,27 @@ final class Test_Aritmetic: XCTestCase {
 		}
 	}
 
+	
+	func test_Sqrt() throws {
+	
+		let base = [9.0, 13.0, 21.0, 44.0, 123.0, 255.0, 12.25]
+		
+		for i in 1..<base.count {
+			
+			T.fractNum = i
+			
+			let f = T(base[i])!
+			let d = Double(base[i])
+			
+			let sqrtf = sqrt(f).description
+			let sqrtd = sqrt(d).description
+			
+			print(i, base[i], ":", f, d, sqrtf, sqrtd)
+			
+			XCTAssertEqual( sqrtf, String(sqrtd.prefix(sqrtf.count)) )
+		}
+	}
+	
 }
 
 
