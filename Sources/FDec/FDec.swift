@@ -526,6 +526,7 @@ func sqrt(_ value: FDec) -> FDec { value.sqrt() }
 
 
 
+
 fileprivate extension Int {
 	
 	func pow10() -> Int {
@@ -554,6 +555,7 @@ fileprivate extension Int {
 }
 	
 }
+
 
 
 fileprivate extension String {
