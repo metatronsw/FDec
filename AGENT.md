@@ -11,7 +11,7 @@ This document defines the behavior and conventions for agents interacting with t
 - For database operations (SQLite, MySQL), store `rawValue` as an integer and restore it with `FDec(raw:)` for fast querying and retrieval. The scale of such a column must stay fixed.
 
 ## Conventions
-- The number of decimal places must be set at the project level before use. The valid range is 0...18; any other value stops the program:
+- The number of decimal places must be set at the project level before any other use of FDec. The valid range is 0...18; any other value stops the program. The first use of the type freezes the scale, and a later change to a different value stops the program as well:
   ```swift
   FDec.decimalPlaces = 3
   ```
@@ -59,9 +59,9 @@ This document defines the behavior and conventions for agents interacting with t
 - Always be explicit about the decimal scale when mixing FDec instances with different precisions.
 - Test edge cases for overflow or underflow, especially in high-value calculations.
 - In tests, pin expected values through `rawValue` or `description`; comparing against an FDec literal runs the same code on both sides.
-- A test that changes `FDec.decimalPlaces` must restore it in `tearDown`.
+- Inside this package, tests change the scale through the internal `FDec.setDecimalPlacesForTesting(_:)` hook and restore it in `tearDown`. The hook is not available to code that uses the library.
 
 ## Restrictions
 - Do not use FDec for floating-point scientific calculations requiring dynamic precision.
 - Mixing scales without proper handling may lead to incorrect results.
-- Changing the decimal places during program execution is not recommended: existing values are reinterpreted with the new scale, and the setting is not thread-safe.
+- The decimal places cannot be changed during program execution: the scale is frozen by the first use of FDec, which is what makes concurrent use safe. Never write code that sets `FDec.decimalPlaces` anywhere but at startup.

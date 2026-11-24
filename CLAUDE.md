@@ -14,7 +14,8 @@ swift test --filter Test_Arithmetic/test_Mul_OtherScales
 ## Munkaszabályok ehhez a kódhoz
 
 - **A `FDec.swift` lezárt:** a szerző külön engedélye nélkül nem módosítható. Minden új funkció a `FDec+Extensions.swift` fájlba kerül extensionként, és csak a mag nyilvános vagy internal elemeire épít (a `private` segédfüggvényei onnan nem érhetők el).
-- `FDec.decimalPlaces` globális, mutálható állapot, érvényes tartománya 0…18 (azon kívül `precondition`). Minden tesztosztály az `FDecTestCase` ősből származzon, amely `setUp`/`tearDown`-ban 4-re állítja vissza.
+- `FDec.decimalPlaces` globális, de **egyszer állítható**: az FDec első használata (számítás, átalakítás, a beállítás kiolvasása) befagyasztja, utána eltérő értékre állítani `precondition`. Érvényes tartomány 0…18. A befagyott skálát egy `static let` tartja, amelyet zárolás nélkül csak olvasunk; ettől szálbiztos a típus.
+- A tesztek a skálát az internal `FDec.setDecimalPlacesForTesting(_:)` kapun át váltják (nem szinkronizált, csak `@testable` importtal érhető el). Minden tesztosztály az `FDecTestCase` ősből származzon, amely `setUp`/`tearDown`-ban 4-re állítja vissza. Tesztben a nyilvános `FDec.decimalPlaces = n` más értékkel leállítja a futást.
 - `FDec("1.5")` literállal a nem opcionális `init(stringLiteral:)`-t hívja (hibánál `fatalError`, az `_` és a szóköz kiszűrve), változóval a szigorú, opcionális `init?(_ description:)`-t. Ugyanez igaz a szám-literálokra. Tesztíráskor ez dönti el, melyik kódút fut.
 - Tesztben a várt értéket `rawValue`-val vagy `.description`-nel kell rögzíteni, nem FDec-literállal (az mindkét oldalon ugyanazt a kódot futtatná).
 - Egy viselkedést egy helyen tesztelünk. Új teszt előtt a tesztfájl `MARK` szakaszaiban meg kell nézni, nincs-e már lefedve.
@@ -29,7 +30,7 @@ swift test --filter Test_Arithmetic/test_Mul_OtherScales
 
 Első elemzés: 2026-11-24, teljes kódolvasás, `swift build` / `swift test`, és egy külön próbaprogram kb. 150 esettel (az összeomlás-gyanús hívások külön folyamatban). Ugyanaznap a hibák egyenként, a szerzővel egyeztetve javítva lettek. Környezet: Swift 5.9.2, macOS 13, x86_64.
 
-**Jelenlegi állapot:** 103 teszt zöld egyetlen fájlban, debug és release build figyelmeztetés nélkül fordul. A korábban összeomló 30 próbaeset mind lefut.
+**Jelenlegi állapot:** 105 teszt zöld egyetlen fájlban, debug és release build figyelmeztetés nélkül fordul. A korábban összeomló 30 próbaeset mind lefut.
 
 ## 1. Javított hibák és a meghozott döntések
 
@@ -57,6 +58,7 @@ Első elemzés: 2026-11-24, teljes kódolvasás, `swift build` / `swift test`, �
 | C7, C8 | Egész initek összeomlottak | Az opcionálisak `nil`-t adnak; túl nagy **literál** `precondition`; a kis egész típusok (Int8…UInt32) nem opcionális initje telítődik végtelenre |
 | C11 | `formatted(groupingSize: 0)` összeomlott | Nulla vagy negatív csoportméret: nincs tagolás |
 | C14 | Érvénytelen `decimalPlaces` üzenet nélkül állt le | `precondition` érthető üzenettel |
+| – | A globális skála nem volt szálbiztos, és futás közben átértelmezte a meglévő értékeket | Egyszer állítható, az első használat befagyasztja; `pow`, `zeroShift`, `intMaxDecimals` csak olvasható. Külön folyamatban és ThreadSanitizerrel ellenőrizve |
 | – | `print` könyvtári kódban | `debugLog`, csak debug buildben |
 
 ### Viselkedésváltozások, amelyek meglévő hívót érinthetnek
@@ -67,12 +69,13 @@ Első elemzés: 2026-11-24, teljes kódolvasás, `swift build` / `swift test`, �
 - **`random(_:_:decimals:)`:** a `decimals` paraméter megszűnt.
 - **`isInfinity`:** negatív végtelenre is igaz.
 - **Törölt belső elemek:** `mulSplit`, `overflow()`.
+- **Skála:** az első használat után `FDec.decimalPlaces` eltérő értékre állítása leállítja a programot; `FDec.pow`, `zeroShift` és `intMaxDecimals` már nem írható.
 
 ## 2. Ami még hátravan
 
 ### Ismert, még nem javított problémák
-- `pow`, `zeroShift`, `intMaxDecimals` nyilvános és írható, így kívülről inkonzisztenssé tehető; `intMaxDecimals` sehol sincs használva.
-- A statikus változók nem szálbiztosak; Swift 6 nyelvi módban fordítási hiba lesz belőlük (nem ellenőrzött).
+- `intMaxDecimals` sehol sincs használva.
+- Swift 6 nyelvi módban a fordítás nem ellenőrzött (a skála már `static let` mögött van, `@unchecked Sendable` tárolóval).
 - `asInt` és `fraction` a jelzőértékekre értelmetlen számot ad; a `debugDescription` ezeket ki is írja.
 - `LosslessStringConvertible` nem teljes: a `"NaN"` / `"Infinity"` kimenetet a szövegértelmező nem olvassa vissza (a Codable dekóder igen).
 - `x / 0` minden esetben `nan` (a `Double` itt előjeles végtelent adna) – ez tudatos döntés maradt.
@@ -98,7 +101,7 @@ Első elemzés: 2026-11-24, teljes kódolvasás, `swift build` / `swift test`, �
 ### Hiányzó funkciók
 - `Int`-es `+` és `-` operátor (ma csak `Int32`-re van).
 - Pénznem szerinti formázás (`.currency(code:)`), `ParseableFormatStyle`.
-- Tartós megoldás a globális skálára: a skála típusba emelése (`FDec<Scale>`) vagy a beállítás egyszer írhatóvá tétele.
+- A skála típusba emelése (`FDec<Scale>`), hogy egy programban több skála is élhessen – a szerző ezt külön forkban tervezi.
 
 ### Csomagolás
 - `LICENSE`, `platforms` a `Package.swift`-ben, Linux-támogatás, CI (macOS + Linux).

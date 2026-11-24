@@ -17,7 +17,7 @@ import Foundation
 
 /// FDec is a single `Int`, so a value can cross concurrency domains freely.
 /// It is spelled `@unchecked` only because the conformance lives outside the file of the type.
-/// Note that this covers the values, not the global `FDec.decimalPlaces` setting.
+/// The global scale is frozen by the first use of FDec, so concurrent calculations only read it.
 extension FDec: @unchecked Sendable {}
 
 // MARK: - Decimal

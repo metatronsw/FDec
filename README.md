@@ -15,7 +15,9 @@ Extremely fast numerical structure for precise decimal fraction calculations. Sa
 
 ## Scale
 
-`FDec.decimalPlaces` sets the number of decimal places for the whole program. The default is 4 and the valid range is 0...18; any other value stops the program with a message. Set it once at startup: every existing value is interpreted with the current scale, so changing it later changes the meaning of the values you already hold.
+`FDec.decimalPlaces` sets the number of decimal places for the whole program. The default is 4 and the valid range is 0...18; any other value stops the program with a message.
+
+Set it once at startup, before anything else touches FDec. The first use of the type (a calculation, a conversion, even reading the setting) freezes the scale for the rest of the program. From then on it is only ever read, which is what makes FDec safe to use from any number of threads. Setting it again to the same value is harmless; setting a different value after the freeze stops the program with a message, instead of silently changing the meaning of the values you already hold.
 
 With `n` decimal places the largest magnitude is about `9.22 × 10^(18 - n)`, which is roughly 922 trillion at the default scale.
 
@@ -166,7 +168,7 @@ When the column has its own fixed scale, convert explicitly, so the stored integ
 
 `FDec(decimal)` converts a Foundation `Decimal`, rounding digits beyond the scale to the nearest value; `asDecimal` and `Decimal(fdec)` go the other way. `Decimal` has no infinity, so the special values become `Decimal.nan`.
 
-`FDec` is `Sendable`: values can be passed between tasks and threads.
+`FDec` is `Sendable`: values can be passed between tasks and threads, and since the scale is frozen by the first use, concurrent calculations are safe.
 
 ## Random values
 
@@ -178,4 +180,4 @@ When the column has its own fixed scale, convert explicitly, so the stored integ
 
 ## Limitations
 
-- The scale is global and not thread-safe; set it before any other use.
+- One program has one scale: it is global and frozen by the first use of FDec.

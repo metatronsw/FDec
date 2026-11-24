@@ -12,11 +12,11 @@ class FDecTestCase: XCTestCase {
 
 	override func setUp() {
 		super.setUp()
-		FDec.decimalPlaces = 4
+		FDec.setDecimalPlacesForTesting(4)
 	}
 
 	override func tearDown() {
-		FDec.decimalPlaces = 4
+		FDec.setDecimalPlacesForTesting(4)
 		super.tearDown()
 	}
 
@@ -43,25 +43,65 @@ final class Test_Scale: FDecTestCase {
 		XCTAssertEqual(FDec.pow, 10000)
 		XCTAssertEqual(FDec.zeroShift, "0000")
 
-		FDec.decimalPlaces = 2
+		FDec.setDecimalPlacesForTesting(2)
 		XCTAssertEqual(FDec.pow, 100)
 		XCTAssertEqual(FDec.zeroShift, "00")
 
-		FDec.decimalPlaces = 0
+		FDec.setDecimalPlacesForTesting(0)
 		XCTAssertEqual(FDec.pow, 1)
 		XCTAssertEqual(FDec.zeroShift, "")
 
-		FDec.decimalPlaces = 18
+		FDec.setDecimalPlacesForTesting(18)
 		XCTAssertEqual(FDec.pow, 1_000_000_000_000_000_000)
+	}
+
+	/// The public setter is frozen by the first use of FDec, which has long happened here.
+	/// Setting the value it already has must stay harmless; a different value stops the
+	/// program, which a unit test cannot observe (it is checked in a separate process).
+	func test_Scale_SettingTheCurrentValueIsAllowed() {
+		FDec.decimalPlaces = 4
+		XCTAssertEqual(FDec.decimalPlaces, 4)
+		XCTAssertEqual(FDec.intMaxDecimals, 15)
+
+		FDec.setDecimalPlacesForTesting(7)
+		FDec.decimalPlaces = 7
+		XCTAssertEqual(FDec.decimalPlaces, 7)
+		XCTAssertEqual(FDec.pow, 10_000_000)
+	}
+
+	/// Many threads computing at once must all see the same scale and get the same results.
+	func test_Scale_ConcurrentUse() {
+		let iterations = 20000
+		let expected = (raw(123_456) * raw(78901) / raw(321)).rawValue
+		let lock = NSLock()
+		var mismatches = 0
+
+		DispatchQueue.concurrentPerform(iterations: 16) { _ in
+			var local = 0
+
+			for index in 0 ..< iterations {
+				let value = raw(123_456) * raw(78901) / raw(321)
+				if value.rawValue != expected { local += 1 }
+				if FDec.pow != 10000 || FDec.decimalPlaces != 4 { local += 1 }
+				if FDec(raw: index).description.isEmpty { local += 1 }
+				if FDec("12.34").rawValue != 123_400 { local += 1 }
+			}
+
+			lock.lock()
+			mismatches += local
+			lock.unlock()
+		}
+
+		XCTAssertEqual(mismatches, 0)
 	}
 
 	/// Documents the hazard of changing the scale: the stored integer stays, its meaning changes.
 	func test_Scale_ChangeReinterpretsValues() {
-		FDec.decimalPlaces = 3
+		FDec.setDecimalPlacesForTesting(3)
 		let value = raw(111_001)
 		XCTAssertEqual(value.description, "111.001")
 
-		FDec.decimalPlaces = 4
+		FDec.setDecimalPlacesForTesting(4)
 		XCTAssertEqual(value.rawValue, 111_001)
 		XCTAssertEqual(value.description, "11.1001")
 	}
@@ -101,7 +141,7 @@ final class Test_Init: FDecTestCase {
 		XCTAssertEqual(FDec(UInt32.max).rawValue, 4_294_967_295 * 10000)
 
 		// Only at very large scales can these overflow; they saturate like arithmetic does.
-		FDec.decimalPlaces = 18
+		FDec.setDecimalPlacesForTesting(18)
 		XCTAssertEqual(FDec(Int8(9)).rawValue, 9_000_000_000_000_000_000)
 		XCTAssertEqual(FDec(Int8(10)).rawValue, Int.max)
 		XCTAssertEqual(FDec(Int32.min).rawValue, -Int.max)
@@ -136,7 +176,7 @@ final class Test_Init: FDecTestCase {
 		XCTAssertNil(FDec(UInt(Int.max) + 1))
 
 		// The extreme raw values are reserved for the special values.
-		FDec.decimalPlaces = 0
+		FDec.setDecimalPlacesForTesting(0)
 		XCTAssertEqual(FDec(Int.max - 1)?.rawValue, Int.max - 1)
 		XCTAssertNil(FDec(Int.max))
 		XCTAssertNil(FDec(-Int.max))
@@ -165,10 +205,10 @@ final class Test_Init: FDecTestCase {
 			XCTAssertEqual(FDec(double)?.rawValue, expected, "\(double)")
 		}
 
-		FDec.decimalPlaces = 2
+		FDec.setDecimalPlacesForTesting(2)
 		XCTAssertEqual(FDec(0.126 as Double)?.rawValue, 13)
 
-		FDec.decimalPlaces = 0
+		FDec.setDecimalPlacesForTesting(0)
 		XCTAssertEqual(FDec(2.6 as Double)?.rawValue, 3)
 	}
 
@@ -222,7 +262,7 @@ final class Test_Init: FDecTestCase {
 		XCTAssertNil(FDec(Float(1e30)))
 
 		// At a large scale the widening noise of Float(0.1) == 0.100000001490116 must not appear.
-		FDec.decimalPlaces = 9
+		FDec.setDecimalPlacesForTesting(9)
 		XCTAssertEqual(FDec(Float(0.1))?.rawValue, 100_000_000)
 		XCTAssertEqual(FDec(Float(19.99))?.rawValue, 19_990_000_000)
 	}
@@ -288,18 +328,18 @@ final class Test_Parsing: FDecTestCase {
 		XCTAssertNil(parse("1000000000000000"))
 		XCTAssertNil(parse("99999999999999999999999999"))
 
-		FDec.decimalPlaces = 0
+		FDec.setDecimalPlacesForTesting(0)
 		XCTAssertEqual(parse("1.9")?.rawValue, 1)
 		XCTAssertEqual(parse("42")?.rawValue, 42)
 
-		FDec.decimalPlaces = 2
+		FDec.setDecimalPlacesForTesting(2)
 		XCTAssertEqual(parse("19.999")?.rawValue, 1999)
 	}
 
 	/// `description` and the parser are inverses of each other at every scale.
 	func test_Parse_RoundTripsDescription() {
 		for places in [0, 2, 4, 9, 18] {
-			FDec.decimalPlaces = places
+			FDec.setDecimalPlacesForTesting(places)
 
 			for _ in 0 ..< 1000 {
 				let original = raw(Int.random(in: -1_000_000_000_000 ... 1_000_000_000_000))
@@ -369,16 +409,16 @@ final class Test_Output: FDecTestCase {
 	}
 
 	func test_Description_OtherScales() {
-		FDec.decimalPlaces = 0
+		FDec.setDecimalPlacesForTesting(0)
 		XCTAssertEqual(raw(1234).description, "1234")
 		XCTAssertEqual(raw(-7).description, "-7")
 
-		FDec.decimalPlaces = 2
+		FDec.setDecimalPlacesForTesting(2)
 		XCTAssertEqual(raw(1999).description, "19.99")
 		XCTAssertEqual(raw(-5).description, "-0.05")
 		XCTAssertEqual(raw(100).description, "1")
 
-		FDec.decimalPlaces = 18
+		FDec.setDecimalPlacesForTesting(18)
 		XCTAssertEqual(raw(1_000_000_000_000_000_000).description, "1")
 		XCTAssertEqual(raw(1_500_000_000_000_000_000).description, "1.5")
 		XCTAssertEqual(raw(1).description, "0.000000000000000001")
@@ -466,7 +506,7 @@ final class Test_Output: FDecTestCase {
 			XCTAssertEqual(raw(value).digitCount, digits, "\(value)")
 		}
 
-		FDec.decimalPlaces = 0
+		FDec.setDecimalPlacesForTesting(0)
 		XCTAssertEqual(raw(1_000_000_000_000_000_000).digitCount, 19)
 	}
 
@@ -493,7 +533,7 @@ final class Test_Output: FDecTestCase {
 
 	func test_Parity() {
 		for places in [0, 1, 4, 7] {
-			FDec.decimalPlaces = places
+			FDec.setDecimalPlacesForTesting(places)
 
 			for n in -6 ... 6 {
 				XCTAssertEqual(make(n).isOdd, n % 2 != 0, "\(n) @\(places)")
@@ -501,7 +541,7 @@ final class Test_Output: FDecTestCase {
 			}
 		}
 
-		FDec.decimalPlaces = 4
+		FDec.setDecimalPlacesForTesting(4)
 
 		// Parity is only defined for whole numbers.
 		for value in [25000, 30001, 1, -1, -25000, 39999] {
@@ -558,20 +598,20 @@ final class Test_Arithmetic: FDecTestCase {
 
 	/// The scaling must not depend on a constant that is only right at four decimals.
 	func test_Mul_OtherScales() {
-		FDec.decimalPlaces = 6
+		FDec.setDecimalPlacesForTesting(6)
 		XCTAssertEqual((make(1000) * make(1000)).rawValue, 1_000_000 * 1_000_000)
 		// 2000.5 * 3000.25 = 6002000.125
 		XCTAssertEqual((make(2000, 500_000) * make(3000, 250_000)).rawValue, 6_002_000_125_000)
 
-		FDec.decimalPlaces = 2
+		FDec.setDecimalPlacesForTesting(2)
 		XCTAssertEqual((make(100_000_000) * make(1_000_000)).rawValue, 100_000_000_000_000 * 100)
 		// 12345678.9 * 98765.43 = 1219326285200.427
 		XCTAssertEqual((make(12_345_678, 90) * make(98765, 43)).rawValue, 121_932_628_520_042)
 
-		FDec.decimalPlaces = 0
+		FDec.setDecimalPlacesForTesting(0)
 		XCTAssertEqual((make(123_456) * make(654_321)).rawValue, 123_456 * 654_321)
 
-		FDec.decimalPlaces = 18
+		FDec.setDecimalPlacesForTesting(18)
 		XCTAssertEqual((make(2) * make(3)).rawValue, 6 * FDec.pow)
 		XCTAssertEqual((make(1) * raw(1)).rawValue, 1)
 	}
@@ -642,7 +682,7 @@ final class Test_Arithmetic: FDecTestCase {
 		}
 
 		for places in [0, 2, 4, 6, 9] {
-			FDec.decimalPlaces = places
+			FDec.setDecimalPlacesForTesting(places)
 			let scale = Decimal(FDec.pow)
 
 			for _ in 0 ..< 2000 {
@@ -695,7 +735,7 @@ final class Test_Arithmetic: FDecTestCase {
 
 		// The remainder does not depend on the scale.
 		for places in [0, 2, 8] {
-			FDec.decimalPlaces = places
+			FDec.setDecimalPlacesForTesting(places)
 
 			for _ in 0 ..< 500 {
 				let x = Int.random(in: -1_000_000_000_000 ... 1_000_000_000_000)
@@ -803,14 +843,14 @@ final class Test_Arithmetic: FDecTestCase {
 			XCTAssertEqual(sqrt(make(n * n)).rawValue, n * 10000, "sqrt(\(n * n))")
 		}
 
-		FDec.decimalPlaces = 2
+		FDec.setDecimalPlacesForTesting(2)
 		XCTAssertEqual(sqrt(make(2)).rawValue, 141)
 
-		FDec.decimalPlaces = 8
+		FDec.setDecimalPlacesForTesting(8)
 		XCTAssertEqual(sqrt(make(2)).rawValue, 141_421_356)
 
 		// Beyond the precision of Double: sqrt(2) = 1.41421356237309504880...
-		FDec.decimalPlaces = 18
+		FDec.setDecimalPlacesForTesting(18)
 		XCTAssertEqual(sqrt(make(2)).rawValue, 1_414_213_562_373_095_048)
 		XCTAssertEqual(make(2).sqrt().rawValue, 1_414_213_562_373_095_048)
 	}
@@ -818,7 +858,7 @@ final class Test_Arithmetic: FDecTestCase {
 	/// All three spellings are one computation, special values included.
 	func test_Sqrt_MatchesSquareRoot() {
 		for places in [0, 4, 9, 18] {
-			FDec.decimalPlaces = places
+			FDec.setDecimalPlacesForTesting(places)
 
 			for _ in 0 ..< 300 {
 				let value = raw(Int.random(in: -1000 ... Int.max - 1))
@@ -841,7 +881,7 @@ final class Test_Arithmetic: FDecTestCase {
 
 	func test_AlgebraicProperties() {
 		for places in [0, 4, 9] {
-			FDec.decimalPlaces = places
+			FDec.setDecimalPlacesForTesting(places)
 			let one = make(1)
 
 			for _ in 0 ..< 1000 {
@@ -923,7 +963,7 @@ final class Test_Rounding: FDecTestCase {
 		]
 
 		for places in [2, 4, 6] {
-			FDec.decimalPlaces = places
+			FDec.setDecimalPlacesForTesting(places)
 			let scale = Decimal(FDec.pow)
 
 			for (rule, mode) in modes {
@@ -1250,10 +1290,10 @@ final class Test_Protocols: FDecTestCase {
 	func test_Codable_IndependentOfScale() throws {
 		let text = try json([raw(123_400)]) // 12.34 written at four decimals
 
-		FDec.decimalPlaces = 2
+		FDec.setDecimalPlacesForTesting(2)
 		XCTAssertEqual(try decode([FDec].self, text).first?.rawValue, 1234)
 
-		FDec.decimalPlaces = 6
+		FDec.setDecimalPlacesForTesting(6)
 		XCTAssertEqual(try decode([FDec].self, text).first?.rawValue, 12_340_000)
 	}
 
@@ -1312,7 +1352,7 @@ final class Test_Random: FDecTestCase {
 		}
 
 		// The scale of the type is always used.
-		FDec.decimalPlaces = 2
+		FDec.setDecimalPlacesForTesting(2)
 		XCTAssertEqual(FDec.random(5 ... 5)?.rawValue, 500)
 		XCTAssertEqual(FDec.random(5 ... 5, 30 ... 30)?.rawValue, 530)
 		XCTAssertNil(FDec.random(5 ... 5, 0 ... 100))
@@ -1369,7 +1409,7 @@ final class Test_Decimal: FDecTestCase {
 
 	func test_Decimal_RoundTrip() {
 		for places in [0, 2, 4, 9, 18] {
-			FDec.decimalPlaces = places
+			FDec.setDecimalPlacesForTesting(places)
 
 			for _ in 0 ..< 500 {
 				let original = raw(Int.random(in: -1_000_000_000_000_000 ... 1_000_000_000_000_000))
@@ -1436,11 +1476,11 @@ final class Test_FixedFormat: FDecTestCase {
 		XCTAssertEqual(fmt(negInf, 2), "-Infinity")
 		XCTAssertEqual(fmt(raw(Int.max - 1), 0), "Infinity") // the rounding itself overflows
 
-		FDec.decimalPlaces = 0
+		FDec.setDecimalPlacesForTesting(0)
 		XCTAssertEqual(fmt(raw(42), 2), "42.00")
 		XCTAssertEqual(fmt(raw(42), 0), "42")
 
-		FDec.decimalPlaces = 2
+		FDec.setDecimalPlacesForTesting(2)
 		XCTAssertEqual(fmt(raw(1999), 2), "19.99")
 		XCTAssertEqual(fmt(raw(1999), 1), "20.0")
 		XCTAssertEqual(fmt(raw(5), 3), "0.050")
@@ -1463,7 +1503,7 @@ final class Test_Allocation: FDecTestCase {
 		XCTAssertEqual(inf.allocated(into: 2).map(\.rawValue), [Int.max, Int.max])
 		XCTAssertTrue(nan.allocated(into: 2).allSatisfy(\.isNan))
 
-		FDec.decimalPlaces = 2
+		FDec.setDecimalPlacesForTesting(2)
 		XCTAssertEqual(make(100).allocated(into: 3).map(\.description), ["33.34", "33.33", "33.33"])
 	}
 
@@ -1574,7 +1614,7 @@ final class Test_Percent: FDecTestCase {
 		]
 
 		for places in [0, 2, 4, 9, 18] {
-			FDec.decimalPlaces = places
+			FDec.setDecimalPlacesForTesting(places)
 			let divisor = Decimal(FDec.pow) * 100
 
 			for (rule, mode) in modes {
@@ -1708,7 +1748,7 @@ final class Test_PowerAndRoot: FDecTestCase {
 		XCTAssertEqual(negInf.raised(to: 3).rawValue, -Int.max)
 		XCTAssertEqual(inf.raised(to: -1).rawValue, 0)
 
-		FDec.decimalPlaces = 18
+		FDec.setDecimalPlacesForTesting(18)
 		XCTAssertEqual(make(2).raised(to: 3).rawValue, 8 * FDec.pow)
 	}
 
@@ -1729,10 +1769,10 @@ final class Test_PowerAndRoot: FDecTestCase {
 		XCTAssertEqual(inf.squareRoot().rawValue, Int.max)
 
 		// sqrt(2) = 1.41421356237309504880..., beyond the precision of Double.
-		FDec.decimalPlaces = 18
+		FDec.setDecimalPlacesForTesting(18)
 		XCTAssertEqual(make(2).squareRoot().rawValue, 1_414_213_562_373_095_048)
 
-		FDec.decimalPlaces = 0
+		FDec.setDecimalPlacesForTesting(0)
 		XCTAssertEqual(raw(99).squareRoot().rawValue, 9)
 		XCTAssertEqual(raw(100).squareRoot().rawValue, 10)
 	}
@@ -1744,7 +1784,7 @@ final class Test_PowerAndRoot: FDecTestCase {
 		}
 
 		for places in [0, 4, 9, 18] {
-			FDec.decimalPlaces = places
+			FDec.setDecimalPlacesForTesting(places)
 
 			var samples = (0 ..< 500).map { _ in Int.random(in: 0 ... Int.max - 1) }
 			samples += (0 ..< 500).map { _ in Int.random(in: 0 ... 1_000_000) }
@@ -1887,7 +1927,7 @@ final class Test_Limits: FDecTestCase {
 		XCTAssertEqual((-greatest - least).rawValue, -Int.max)
 		XCTAssertTrue((greatest - least).isFinite)
 
-		FDec.decimalPlaces = 2
+		FDec.setDecimalPlacesForTesting(2)
 		XCTAssertEqual(FDec.leastNonzeroMagnitude.description, "0.01")
 	}
 
@@ -1955,7 +1995,7 @@ final class Test_ScaleConversion: FDecTestCase {
 		XCTAssertNil(FDec(raw: Int.min, scale: 4))
 		XCTAssertEqual(FDec(raw: Int.max, scale: 6)?.rawValue, 92_233_720_368_547_758)
 
-		FDec.decimalPlaces = 2
+		FDec.setDecimalPlacesForTesting(2)
 		XCTAssertEqual(FDec(raw: 123_456, scale: 4)?.rawValue, 1235)
 		XCTAssertEqual(FDec(raw: 12, scale: 0)?.rawValue, 1200)
 	}
@@ -1981,7 +2021,7 @@ final class Test_ScaleConversion: FDecTestCase {
 	/// A finer scale holds every value of a coarser one, so the trip there and back is lossless.
 	func test_ScaleConversion_RoundTrip() {
 		for (places, finer) in [(0, 6), (2, 4), (4, 9), (4, 4)] {
-			FDec.decimalPlaces = places
+			FDec.setDecimalPlacesForTesting(places)
 
 			for _ in 0 ..< 500 {
 				let original = raw(Int.random(in: -1_000_000_000 ... 1_000_000_000))

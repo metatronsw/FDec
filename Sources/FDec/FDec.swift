@@ -40,18 +40,38 @@ extension FDec {
 
 	/// Project-based setting that lets you set the number of decimal places.
 	/// The valid range is 0...18; anything else stops the program with a message.
-	public static var decimalPlaces: Int = 4 {
-		didSet {
-			precondition((0 ... 18).contains(decimalPlaces), "FDec.decimalPlaces must be in 0...18, got \(decimalPlaces)")
-			pow = decimalPlaces.pow10()
-			zeroShift = String(repeating: "0", count: decimalPlaces)
-			intMaxDecimals = 19 - decimalPlaces
-		}
+	///
+	/// It can only be changed before FDec is first used. The first use of the type (any
+	/// calculation, conversion, or reading this setting) freezes the scale for the rest of the
+	/// program, which makes it safe to use FDec from any number of threads: from then on the
+	/// scale is only ever read. Setting it again to the value it already has is allowed;
+	/// setting it to a different value after the freeze stops the program with a message.
+	public static var decimalPlaces: Int {
+		get { scale.decimalPlaces }
+		set { configuration.set(newValue) }
 	}
 
-	public static var pow = decimalPlaces.pow10()
-	public static var zeroShift = String(repeating: "0", count: decimalPlaces)
-	public static var intMaxDecimals = 19 - decimalPlaces
+	/// 10 to the power of `decimalPlaces`: the raw value of the number one.
+	public static var pow: Int { scale.pow }
+
+	/// As many zeros as there are decimal places.
+	public static var zeroShift: String { scale.zeroShift }
+
+	public static var intMaxDecimals: Int { 19 - scale.decimalPlaces }
+
+	/// What `decimalPlaces` was set to before the first use. Guarded by its own lock.
+	private static let configuration = ScaleConfiguration()
+
+	/// The frozen scale. A static `let` is initialized exactly once, thread-safely,
+	/// on first access, and that access is what freezes the configuration.
+	private static let scale: Scale = configuration.freeze()
+
+	/// Changes the scale even after it was frozen. For the tests of this package only:
+	/// it is not synchronized and reinterprets every existing value.
+	static func setDecimalPlacesForTesting(_ places: Int) {
+		configuration.overwrite(places)
+		scale.update(places)
+	}
 
 	public static let zero = FDec()
 	/// Positive infinity. Negative infinity is `-FDec.infinity`.
@@ -749,6 +769,69 @@ public extension FDec {
 }
 
 public func sqrt(_ value: FDec) -> FDec { value.sqrt() }
+
+/// The scale in effect. Written only while it is created (and by the testing hook),
+/// read without locking by everything else.
+private final class Scale: @unchecked Sendable {
+
+	private(set) var decimalPlaces: Int
+	private(set) var pow: Int
+	private(set) var zeroShift: String
+
+	init(_ places: Int) {
+		decimalPlaces = places
+		pow = places.pow10()
+		zeroShift = String(repeating: "0", count: places)
+	}
+
+	func update(_ places: Int) {
+		decimalPlaces = places
+		pow = places.pow10()
+		zeroShift = String(repeating: "0", count: places)
+	}
+
+}
+
+/// The requested scale until the first use of FDec freezes it.
+private final class ScaleConfiguration: @unchecked Sendable {
+
+	private let lock = NSLock()
+	private var places = 4
+	private var frozen = false
+
+	private static func check(_ places: Int) {
+		precondition((0 ... 18).contains(places), "FDec.decimalPlaces must be in 0...18, got \(places)")
+	}
+
+	func set(_ newValue: Int) {
+		Self.check(newValue)
+
+		lock.lock()
+		defer { lock.unlock() }
+
+		precondition(!frozen || newValue == places,
+						 "FDec.decimalPlaces is frozen at \(places) by the first use of FDec and cannot be changed to \(newValue); set it before any other use")
+		places = newValue
+	}
+
+	func freeze() -> Scale {
+		lock.lock()
+		defer { lock.unlock() }
+
+		frozen = true
+		return Scale(places)
+	}
+
+	func overwrite(_ newValue: Int) {
+		Self.check(newValue)
+
+		lock.lock()
+		defer { lock.unlock() }
+
+		places = newValue
+	}
+
+}
 
 private extension Int {
 	func pow10() -> Int {
