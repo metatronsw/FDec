@@ -808,6 +808,35 @@ final class Test_Arithmetic: FDecTestCase {
 
 		FDec.decimalPlaces = 8
 		XCTAssertEqual(sqrt(make(2)).rawValue, 141_421_356)
+
+		// Beyond the precision of Double: sqrt(2) = 1.41421356237309504880...
+		FDec.decimalPlaces = 18
+		XCTAssertEqual(sqrt(make(2)).rawValue, 1_414_213_562_373_095_048)
+		XCTAssertEqual(make(2).sqrt().rawValue, 1_414_213_562_373_095_048)
+	}
+
+	/// All three spellings are one computation, special values included.
+	func test_Sqrt_MatchesSquareRoot() {
+		for places in [0, 4, 9, 18] {
+			FDec.decimalPlaces = places
+
+			for _ in 0 ..< 300 {
+				let value = raw(Int.random(in: -1000 ... Int.max - 1))
+				let expected = value.squareRoot()
+
+				if expected.isNan {
+					XCTAssertTrue(value.sqrt().isNan)
+					XCTAssertTrue(sqrt(value).isNan)
+				} else {
+					XCTAssertEqual(value.sqrt().rawValue, expected.rawValue, "\(value.rawValue) @\(places)")
+					XCTAssertEqual(sqrt(value).rawValue, expected.rawValue, "\(value.rawValue) @\(places)")
+				}
+			}
+		}
+
+		XCTAssertEqual(sqrt(inf).rawValue, Int.max)
+		XCTAssertTrue(sqrt(negInf).isNan)
+		XCTAssertTrue(sqrt(nan).isNan)
 	}
 
 	func test_AlgebraicProperties() {

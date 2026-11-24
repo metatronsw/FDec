@@ -81,7 +81,7 @@ More helpers:
 	[a, b, c].average()                        // FDec?, nil when empty
 ```
 
-`raised(to:)` rounds at every multiplication, so with fractions the last digits can differ from the exactly rounded power. `squareRoot()` works on integers; the older `sqrt()` goes through `Double` and is accurate to about 15 significant digits.
+`raised(to:)` rounds at every multiplication, so with fractions the last digits can differ from the exactly rounded power. `squareRoot()` works on integers and is exact to the last digit; `x.sqrt()` and `sqrt(x)` are the same computation.
 
 ## Money helpers
 
@@ -179,4 +179,3 @@ When the column has its own fixed scale, convert explicitly, so the stored integ
 ## Limitations
 
 - The scale is global and not thread-safe; set it before any other use.
-- `sqrt` goes through `Double`, so it is only accurate to about 15 significant digits; use `squareRoot()` for an exact result.

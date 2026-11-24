@@ -65,4 +65,3 @@ This document defines the behavior and conventions for agents interacting with t
 - Do not use FDec for floating-point scientific calculations requiring dynamic precision.
 - Mixing scales without proper handling may lead to incorrect results.
 - Changing the decimal places during program execution is not recommended: existing values are reinterpreted with the new scale, and the setting is not thread-safe.
-- `sqrt` goes through `Double` and is only accurate to about 15 significant digits.

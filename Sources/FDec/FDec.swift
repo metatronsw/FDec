@@ -744,10 +744,8 @@ extension FDec: Codable {
 }
 
 public extension FDec {
-	func sqrt() -> FDec {
-		let root = Darwin.sqrt(asDouble)
-		return FDec(truncating: root)
-	}
+	/// The exact, truncated square root. See `squareRoot()` in FDec+Extensions.swift.
+	func sqrt() -> FDec { squareRoot() }
 }
 
 public func sqrt(_ value: FDec) -> FDec { value.sqrt() }

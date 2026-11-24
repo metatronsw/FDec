@@ -325,7 +325,7 @@ extension FDec {
 	}
 
 	/// The square root computed on integers: exact to the last digit of the scale and truncated,
-	/// at every scale. (`sqrt()` goes through Double and is only good for about 15 digits.)
+	/// at every scale. `sqrt()` and the free function `sqrt(_:)` are the same computation.
 	/// A negative value gives `.nan`.
 	public func squareRoot() -> FDec {
 		guard !isNan, rawValue >= 0 else { return .nan }

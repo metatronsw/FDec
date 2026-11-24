@@ -29,7 +29,7 @@ swift test --filter Test_Arithmetic/test_Mul_OtherScales
 
 Első elemzés: 2026-11-24, teljes kódolvasás, `swift build` / `swift test`, és egy külön próbaprogram kb. 150 esettel (az összeomlás-gyanús hívások külön folyamatban). Ugyanaznap a hibák egyenként, a szerzővel egyeztetve javítva lettek. Környezet: Swift 5.9.2, macOS 13, x86_64.
 
-**Jelenlegi állapot:** 102 teszt zöld egyetlen fájlban, debug és release build figyelmeztetés nélkül fordul. A korábban összeomló 30 próbaeset mind lefut.
+**Jelenlegi állapot:** 103 teszt zöld egyetlen fájlban, debug és release build figyelmeztetés nélkül fordul. A korábban összeomló 30 próbaeset mind lefut.
 
 ## 1. Javított hibák és a meghozott döntések
 
@@ -71,7 +71,6 @@ Első elemzés: 2026-11-24, teljes kódolvasás, `swift build` / `swift test`, �
 ## 2. Ami még hátravan
 
 ### Ismert, még nem javított problémák
-- `Darwin.sqrt` – Linuxon nem fordul (nem ellenőrzött). A régi `sqrt` Double-ön át számol, ~15 értékes jegy fölött pontatlan; pontos gyökhöz a `squareRoot()` való.
 - `pow`, `zeroShift`, `intMaxDecimals` nyilvános és írható, így kívülről inkonzisztenssé tehető; `intMaxDecimals` sehol sincs használva.
 - A statikus változók nem szálbiztosak; Swift 6 nyelvi módban fordítási hiba lesz belőlük (nem ellenőrzött).
 - `asInt` és `fraction` a jelzőértékekre értelmetlen számot ad; a `debugDescription` ezeket ki is írja.
@@ -87,7 +86,7 @@ Első elemzés: 2026-11-24, teljes kódolvasás, `swift build` / `swift test`, �
 - `Sendable` megfelelés (`@unchecked`, mert a típus fájlján kívül van deklarálva). Az értékekre vonatkozik, a globális `decimalPlaces` továbbra sem szálbiztos.
 - `FDec * Int`, `Int * FDec`, `FDec / Int`, `*=`, `/=` – a szorzó nincs skálázva, ezért pontos, és olyan nagy egésszel is működik, amely FDec-ként nem férne el. Egész literálnál (`x * 2`) a fordító mostantól ezt a változatot választja; az eredmény ugyanaz.
 - `raised(to:rounding:)` és a szabad `pow(_:_:)` – ismételt négyzetre emelés; minden lépés kerekít, ezért törtnél az utolsó jegyek eltérhetnek a pontosan kerekített hatványtól. Negatív kitevő a reciprokot adja.
-- `squareRoot()` – egész alapú, minden skálán az utolsó jegyig pontos, vágott gyök. A régi `sqrt()` (Double-ön át) változatlanul megmaradt.
+- `squareRoot()` – egész alapú, minden skálán az utolsó jegyig pontos, vágott gyök. A `FDec.swift`-beli `sqrt()` és a szabad `sqrt(_:)` a szerző külön engedélyével erre hív tovább, így a `Darwin.sqrt` függőség megszűnt.
 - `floor(places:)`, `ceil(places:)`, `truncated(places:)`, `isWhole`, `signum()`, `clamped(to:)`.
 - `Sequence<FDec>.sum()` és `average(rounding:)` – 128 bites összegzés, így a közben túlcsorduló, de végül elférő összeg is helyes.
 - `addingReportingOverflow` / `subtracting…` / `multiplied…(by:)` / `divided…(by:)` – a szokásos eredmény és egy jelző; a jelző minden nem véges eredményre igaz (NaN-ra és eleve nem véges operandusra is).
