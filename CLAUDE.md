@@ -1,21 +1,23 @@
 # FDec – projektútmutató és elemzési jelentés
 
 Fixpontos decimális számtípus Swifthez: egyetlen `Int` tárolja az értéket `10^decimalPlaces`-szel eltolva.
-Egy forrásfájl ([Sources/FDec/FDec.swift](Sources/FDec/FDec.swift)), két tesztfájl ([FDecTests.swift](Tests/FDecTests/FDecTests.swift) – eredeti, [RegressionTests.swift](Tests/FDecTests/RegressionTests.swift) – a javításokhoz), függőség nincs.
+Két forrásfájl: a mag ([Sources/FDec/FDec.swift](Sources/FDec/FDec.swift)) és a ráépülő kiegészítések ([Sources/FDec/FDec+Extensions.swift](Sources/FDec/FDec+Extensions.swift)). Egy tesztfájl ([Tests/FDecTests/FDecTests.swift](Tests/FDecTests/FDecTests.swift)), függőség nincs.
 
 ## Parancsok
 
 ```bash
 swift build
 swift test
-swift test --filter Test_Regression/test_H2_Mul_OtherScales
+swift test --filter Test_Arithmetic/test_Mul_OtherScales
 ```
 
 ## Munkaszabályok ehhez a kódhoz
 
-- `FDec.decimalPlaces` globális, mutálható állapot, érvényes tartománya 0…18 (azon kívül `precondition`). Teszt, amely átírja, `setUp`/`tearDown`-ban állítsa vissza 4-re, ahogy a `Test_Regression` teszi.
+- **A `FDec.swift` lezárt:** a szerző külön engedélye nélkül nem módosítható. Minden új funkció a `FDec+Extensions.swift` fájlba kerül extensionként, és csak a mag nyilvános vagy internal elemeire épít (a `private` segédfüggvényei onnan nem érhetők el).
+- `FDec.decimalPlaces` globális, mutálható állapot, érvényes tartománya 0…18 (azon kívül `precondition`). Minden tesztosztály az `FDecTestCase` ősből származzon, amely `setUp`/`tearDown`-ban 4-re állítja vissza.
 - `FDec("1.5")` literállal a nem opcionális `init(stringLiteral:)`-t hívja (hibánál `fatalError`, az `_` és a szóköz kiszűrve), változóval a szigorú, opcionális `init?(_ description:)`-t. Ugyanez igaz a szám-literálokra. Tesztíráskor ez dönti el, melyik kódút fut.
 - Tesztben a várt értéket `rawValue`-val vagy `.description`-nel kell rögzíteni, nem FDec-literállal (az mindkét oldalon ugyanazt a kódot futtatná).
+- Egy viselkedést egy helyen tesztelünk. Új teszt előtt a tesztfájl `MARK` szakaszaiban meg kell nézni, nincs-e már lefedve.
 - Aritmetikában tilos a csapdázó `Int` művelet; `…ReportingOverflow` vagy `multipliedFullWidth` / `dividingFullWidth` kell. Minden új művelet kezelje a három jelzőértéket (`isFinite` ág).
 - Fenntartott nyers értékek: `Int.min` = `nan`, `Int.max` = `infinity`, `-Int.max` = negatív végtelen. Számított nyers értéket a `checked(_:)` segédfüggvényen át kell visszaadni.
 - `nan` összehasonlítása a `Double` szabályait követi (`nan != nan`), ezért `XCTAssertEqual` helyett `isNan` kell, és mind a négy rendező operátor kézzel van megírva.
@@ -27,7 +29,7 @@ swift test --filter Test_Regression/test_H2_Mul_OtherScales
 
 Első elemzés: 2026-11-24, teljes kódolvasás, `swift build` / `swift test`, és egy külön próbaprogram kb. 150 esettel (az összeomlás-gyanús hívások külön folyamatban). Ugyanaznap a hibák egyenként, a szerzővel egyeztetve javítva lettek. Környezet: Swift 5.9.2, macOS 13, x86_64.
 
-**Jelenlegi állapot:** 73 teszt zöld (19 eredeti + 54 regressziós), debug és release build figyelmeztetés nélkül fordul. A korábban összeomló 30 próbaeset mind lefut. Semmi nincs commitolva.
+**Jelenlegi állapot:** 93 teszt zöld egyetlen fájlban, debug és release build figyelmeztetés nélkül fordul. A korábban összeomló 30 próbaeset mind lefut.
 
 ## 1. Javított hibák és a meghozott döntések
 
@@ -69,7 +71,7 @@ Első elemzés: 2026-11-24, teljes kódolvasás, `swift build` / `swift test`, �
 ## 2. Ami még hátravan
 
 ### Ismert, még nem javított problémák
-- `Darwin.sqrt` – Linuxon nem fordul (nem ellenőrzött). Az `sqrt` Double-ön át számol, ~15 értékes jegy fölött pontatlan.
+- `Darwin.sqrt` – Linuxon nem fordul (nem ellenőrzött). A régi `sqrt` Double-ön át számol, ~15 értékes jegy fölött pontatlan; pontos gyökhöz a `squareRoot()` való.
 - `pow`, `zeroShift`, `intMaxDecimals` nyilvános és írható, így kívülről inkonzisztenssé tehető; `intMaxDecimals` sehol sincs használva.
 - A statikus változók nem szálbiztosak; Swift 6 nyelvi módban fordítási hiba lesz belőlük (nem ellenőrzött).
 - `asInt` és `fraction` a jelzőértékekre értelmetlen számot ad; a `debugDescription` ezeket ki is írja.
@@ -77,11 +79,22 @@ Első elemzés: 2026-11-24, teljes kódolvasás, `swift build` / `swift test`, �
 - `x / 0` minden esetben `nan` (a `Double` itt előjeles végtelent adna) – ez tudatos döntés maradt.
 - `.gitignore`: a `.icns` minta nem illeszkedik semmire (`*.icns` kellene), a `fdec.icns` (480 KB) követett fájl. Nincs `LICENSE` fájl.
 
+### Elkészült kiegészítések (`FDec+Extensions.swift`)
+- `init?(_: Decimal)`, `asDecimal`, `Decimal(FDec)` – a `Decimal`-nak nincs végtelenje, ezért a jelzőértékek `Decimal.nan`-ra képződnek.
+- `formatted(fractionDigits:rounding:…)` – rögzített tizedesszám (`12.5` → `"12.50"`); nullára kerekedő érték előjel nélkül jelenik meg.
+- `allocated(into:)`, `allocated(ratios:)` – maradék nélküli szétosztás; a fennmaradó egységek az első (nem nulla arányú) részekhez kerülnek. Érvénytelen bemenetre üres tömb.
+- `percent(_:rounding:)`, `adding(percent:)`, `subtracting(percent:)` – egy lépésben, egyetlen kerekítéssel; alapértelmezés a féltől felfelé kerekítés.
+- `Sendable` megfelelés (`@unchecked`, mert a típus fájlján kívül van deklarálva). Az értékekre vonatkozik, a globális `decimalPlaces` továbbra sem szálbiztos.
+- `FDec * Int`, `Int * FDec`, `FDec / Int`, `*=`, `/=` – a szorzó nincs skálázva, ezért pontos, és olyan nagy egésszel is működik, amely FDec-ként nem férne el. Egész literálnál (`x * 2`) a fordító mostantól ezt a változatot választja; az eredmény ugyanaz.
+- `raised(to:rounding:)` és a szabad `pow(_:_:)` – ismételt négyzetre emelés; minden lépés kerekít, ezért törtnél az utolsó jegyek eltérhetnek a pontosan kerekített hatványtól. Negatív kitevő a reciprokot adja.
+- `squareRoot()` – egész alapú, minden skálán az utolsó jegyig pontos, vágott gyök. A régi `sqrt()` (Double-ön át) változatlanul megmaradt.
+- `floor(places:)`, `ceil(places:)`, `truncated(places:)`, `isWhole`, `signum()`, `clamped(to:)`.
+- `Sequence<FDec>.sum()` és `average(rounding:)` – 128 bites összegzés, így a közben túlcsorduló, de végül elférő összeg is helyes.
+
 ### Hiányzó funkciók
-- `Decimal` / `NSDecimalNumber` átjárás, `Sendable` megfelelés.
-- `signum`, `pow(_: Int)`, `Int`-es operátorváltozatok (ma csak `Int32` van, és a `*`, `/` nem értékadó `Int32`-es alakja hiányzik).
-- Egészaritmetikás `sqrt`.
-- `formatted` `Locale` paraméterrel és rögzített tizedesszámmal (`12.50`), `FormatStyle` megfelelés.
+- `Int`-es `+` és `-` operátor (ma csak `Int32`-re van).
+- `formatted` `Locale` paraméterrel, `FormatStyle` megfelelés, szöveg beolvasása locale szerint.
+- `addingReportingOverflow` / `multipliedReportingOverflow`, `FDec.max` / `min` / `ulp`.
 - Skálaváltás (`rescaled(to:)`).
 - Tartós megoldás a globális skálára: a skála típusba emelése (`FDec<Scale>`) vagy a beállítás egyszer írhatóvá tétele.
 
@@ -89,30 +102,25 @@ Első elemzés: 2026-11-24, teljes kódolvasás, `swift build` / `swift test`, �
 - `LICENSE`, `platforms` a `Package.swift`-ben, Linux-támogatás, CI (macOS + Linux).
 - A README és az AGENT.md frissítve (a README példái lefordítva és lefuttatva ellenőrizve).
 
-## 3. Az eredeti tesztfájl értékelése
+## 3. A tesztfájl felépítése
 
-A [FDecTests.swift](Tests/FDecTests/FDecTests.swift) érintetlen maradt; a hibáit a regressziós fájl kerüli meg, de nem javítja.
+Az eredeti tesztfájl és a javításokhoz írt regressziós fájl egyetlen fájlba lett összevonva; az átfedő esetek (alapműveletek kis számokon, szöveges init, formázás) egyszer szerepelnek, az eredeti fájl hibás tesztjei (állapotszivárgás, locale-függés, tautologikus állítások, prefix-összehasonlítás) megszűntek.
 
-- **Állapotszivárgás:** `test_Sqrt` 1…6-ra állítja a `decimalPlaces`-t és nem állítja vissza. Az XCTest ábécérendje miatt a `Test_Common` első négy tesztje 6 tizedessel fut, amíg `test_Init_Self` vissza nem állítja 4-re.
-- **`test_Sqrt`** `1..<base.count` miatt a `9.0` alapot kihagyja.
-- **Locale-függés:** `test_Output_Formatted` az alapértelmezett locale-lal `"1 000"`-et vár. Ez `en_HU` alatt átmegy, `en_US` vagy `hu_HU` alatt elbukna.
-- **Tautológia:** `XCTAssertEqual(T("1_000"), "1000")` mindkét oldalon ugyanazt az értelmezőt futtatja.
-- **Rossz paraméter:** `XCTAssertNil(T(strUnderscore)?.description, "123456789")` – a második argumentum hibaüzenet, nem várt érték.
-- **Gyenge prefix-összehasonlítás:** `test_Random` a `Decimal` eredményt az FDec kimenet hosszára vágja, tehát egy túl rövid hibás eredmény is átmegy.
-- **`test_Fraction_Mod`** csak `4 % 3` és `8 % 2`; **`test_Fraction_Sub`** első négy állítása összeadás.
-- **`test_Init_Self`** neve félrevezető: azt rögzíti, hogy skálaváltás után ugyanaz a literál nem egyenlő önmagával.
-- `test_Negate` nem hívja a `negate()`-et; kikommentelt állítások és `print` sorok maradtak; az osztálynév elírt (`Test_Aritmetic`).
+| Osztály | Mit fed le |
+|---------|------------|
+| `Test_Scale` | `pow` / `zeroShift` követi a skálát; skálaváltás újraértelmezi a tárolt értéket |
+| `Test_Init` | literálok, egész típusok, `Double` / `Float` / `truncating` / `exactly` |
+| `Test_Parsing` | szigorú értelmező (elfogadott, elutasított, határok), `description` oda-vissza, `Substring`, `int:frc:sign:` |
+| `Test_Output` | `description` több skálán, `formatted`, átalakítások, `asUInt32`, `digitCount`, előjel, párosság |
+| `Test_Arithmetic` | `+ - * / %`, több skála, túlcsordulás, `quotientAndRemainder`, összetett és `Int32`-es operátorok, `sqrt`, algebrai tulajdonságok, `Decimal`-lal összevetett véletlen esetek |
+| `Test_Rounding` | `multiplied` / `divided` kerekítési módokkal, `rounded(places:)`, `Decimal`-lal összevetve |
+| `Test_SpecialValues` | `nan` és a végtelenek azonosítása, terjedése, kiírása, összehasonlítása |
+| `Test_Protocols` | `Comparable`, `Hashable`, `Strideable`, `Codable` |
+| `Test_Random` | `random(in:)` és `random(_:_:)` |
+| `Test_Decimal`, `Test_FixedFormat`, `Test_Allocation`, `Test_Percent`, `Test_Sendable`, `Test_WholeNumberOperators`, `Test_PowerAndRoot`, `Test_Helpers`, `Test_Sums` | a `FDec+Extensions.swift` függvényei |
 
-## 4. Még megírandó tesztek
+## 4. Ami tesztből még hiányzik
 
-A regressziós fájl lefedi az 1. fejezet minden sorát, több helyen `Decimal`-lal összevetett véletlen esetekkel és több skálán. Ami még nincs lefedve:
-
-- `Hashable`: `Set([a, b]).count`, szótárkulcsként használat.
-- `Strideable`: `stride(from:to:by:)` és `through:` elemszáma, `distance(to:)`, `advanced(by:)`.
-- `description` a 4-től eltérő skálákon (0 és 18 is), `debugDescription`.
-- `fraction`, `asFloat`, `asInt` negatív és nagy értékre; `Int(FDec)`, `Double(FDec)`, `Float(FDec)`.
-- `init(_: Substring)`, `init(_: FDec)`, `magnitude` és `negate()` véges értékre, `sign` / `signFull`.
-- Tulajdonságalapú tesztek: kommutativitás, `(a + b) - b == a`, `a * 1 == a`, `a / 1 == a`.
-- `Int32`-es operátorok mindkét oldalon, `reduce(0, +)`.
 - Teljesítmény: `measure {}` a négy alapműveletre `Decimal`-lal összevetve – a README „extremely fast” állítását ma semmi nem támasztja alá, és a jelzőértékek ellenőrzése plusz elágazásokat hozott.
-- Az összeomlással járó szándékos leállások (`decimalPlaces` tartomány, túl nagy literál, `rounded(places:)` negatív értékkel) XCTesttel nem tesztelhetők; ezeket külön folyamatban kell ellenőrizni.
+- A szándékos leállások (`decimalPlaces` tartomány, túl nagy literál, `rounded(places:)` negatív értékkel, `random(in:)` nem véges határral) XCTesttel nem tesztelhetők; ezeket külön folyamatban kell ellenőrizni.
+- `formatted()` alapértelmezett elválasztói csak a futtató gép locale-jával vannak ellenőrizve.
