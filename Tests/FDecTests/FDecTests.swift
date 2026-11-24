@@ -635,6 +635,12 @@ final class Test_Arithmetic: FDecTestCase {
 	}
 
 	func test_MulDiv_RandomAgainstDecimal() {
+		// A small divisor at a large scale really overflows; the expected magnitude is then
+		// that of an infinity, and the sign assertions below check which one.
+		func reference(_ exact: Decimal) -> String {
+			exact >= Decimal(Int.max) ? String(Int.max) : exact.description
+		}
+
 		for places in [0, 2, 4, 6, 9] {
 			FDec.decimalPlaces = places
 			let scale = Decimal(FDec.pow)
@@ -649,7 +655,7 @@ final class Test_Arithmetic: FDecTestCase {
 				NSDecimalRound(&truncated, &exactProduct, 0, .down)
 
 				let product = raw(a) * raw(b)
-				XCTAssertEqual(String(product.rawValue.magnitude), truncated.description, "\(a) * \(b) @\(places)")
+				XCTAssertEqual(String(product.rawValue.magnitude), reference(truncated), "\(a) * \(b) @\(places)")
 				if product.rawValue != 0 {
 					XCTAssertEqual(product.rawValue < 0, (a < 0) != (b < 0), "sign \(a) * \(b) @\(places)")
 				}
@@ -661,7 +667,7 @@ final class Test_Arithmetic: FDecTestCase {
 				NSDecimalRound(&truncated, &exactQuotient, 0, .down)
 
 				let quotient = raw(n) / raw(d)
-				XCTAssertEqual(String(quotient.rawValue.magnitude), truncated.description, "\(n) / \(d) @\(places)")
+				XCTAssertEqual(String(quotient.rawValue.magnitude), reference(truncated), "\(n) / \(d) @\(places)")
 				if quotient.rawValue != 0 {
 					XCTAssertEqual(quotient.rawValue < 0, (n < 0) != (d < 0), "sign \(n) / \(d) @\(places)")
 				}
@@ -1832,6 +1838,215 @@ final class Test_Sums: FDecTestCase {
 			XCTAssertEqual(elements.sum().rawValue, total)
 			XCTAssertEqual(elements.average()?.rawValue, total / values.count)
 		}
+	}
+
+}
+
+final class Test_Limits: FDecTestCase {
+
+	func test_Limits() {
+		let greatest = FDec.greatestFiniteMagnitude
+		let least = FDec.leastNonzeroMagnitude
+
+		XCTAssertEqual(greatest.rawValue, Int.max - 1)
+		XCTAssertTrue(greatest.isFinite)
+		XCTAssertTrue((-greatest).isFinite)
+		XCTAssertEqual(least.rawValue, 1)
+
+		// One step beyond the greatest value is infinity, in both directions.
+		XCTAssertEqual((greatest + least).rawValue, Int.max)
+		XCTAssertEqual((-greatest - least).rawValue, -Int.max)
+		XCTAssertTrue((greatest - least).isFinite)
+
+		FDec.decimalPlaces = 2
+		XCTAssertEqual(FDec.leastNonzeroMagnitude.description, "0.01")
+	}
+
+	func test_ReportingOverflow() {
+		let big = FDec.greatestFiniteMagnitude
+
+		var result = make(1).addingReportingOverflow(make(2))
+		XCTAssertEqual(result.partialValue.rawValue, 30000)
+		XCTAssertFalse(result.overflow)
+
+		result = big.addingReportingOverflow(make(1))
+		XCTAssertEqual(result.partialValue.rawValue, Int.max)
+		XCTAssertTrue(result.overflow)
+
+		result = make(1).subtractingReportingOverflow(make(3))
+		XCTAssertEqual(result.partialValue.rawValue, -20000)
+		XCTAssertFalse(result.overflow)
+
+		result = (-big).subtractingReportingOverflow(big)
+		XCTAssertEqual(result.partialValue.rawValue, -Int.max)
+		XCTAssertTrue(result.overflow)
+
+		result = make(3).multipliedReportingOverflow(by: make(-2))
+		XCTAssertEqual(result.partialValue.rawValue, -60000)
+		XCTAssertFalse(result.overflow)
+
+		result = big.multipliedReportingOverflow(by: make(2))
+		XCTAssertEqual(result.partialValue.rawValue, Int.max)
+		XCTAssertTrue(result.overflow)
+
+		result = make(3).dividedReportingOverflow(by: make(2))
+		XCTAssertEqual(result.partialValue.rawValue, 15000)
+		XCTAssertFalse(result.overflow)
+
+		result = make(3).dividedReportingOverflow(by: make(0))
+		XCTAssertTrue(result.partialValue.isNan)
+		XCTAssertTrue(result.overflow)
+
+		// Operands that are already not finite are reported as well.
+		XCTAssertTrue(inf.addingReportingOverflow(make(1)).overflow)
+		XCTAssertTrue(make(1).multipliedReportingOverflow(by: nan).overflow)
+	}
+
+}
+
+final class Test_ScaleConversion: FDecTestCase {
+
+	func test_InitRawScale() {
+		XCTAssertEqual(FDec(raw: 1234, scale: 2)?.rawValue, 123_400)
+		XCTAssertEqual(FDec(raw: 5, scale: 0)?.rawValue, 50000)
+		XCTAssertEqual(FDec(raw: -77, scale: 4)?.rawValue, -77)
+
+		// 0.123456 has more digits than four decimals can hold.
+		XCTAssertEqual(FDec(raw: 123_456, scale: 6)?.rawValue, 1235)
+		XCTAssertEqual(FDec(raw: -123_456, scale: 6)?.rawValue, -1235)
+		XCTAssertEqual(FDec(raw: 123_456, scale: 6, rounding: .towardZero)?.rawValue, 1234)
+		XCTAssertEqual(FDec(raw: 50, scale: 6)?.rawValue, 1) // 0.00005, a tie
+		XCTAssertEqual(FDec(raw: 50, scale: 6, rounding: .toNearestOrEven)?.rawValue, 0)
+		XCTAssertEqual(FDec(raw: 1, scale: 18)?.rawValue, 0)
+
+		XCTAssertNil(FDec(raw: 1, scale: 19))
+		XCTAssertNil(FDec(raw: 1, scale: -1))
+		XCTAssertNil(FDec(raw: Int.max / 100, scale: 0)) // overflows when scaled up
+		XCTAssertNil(FDec(raw: Int.max, scale: 4)) // the raw value of infinity
+		XCTAssertNil(FDec(raw: Int.min, scale: 4))
+		XCTAssertEqual(FDec(raw: Int.max, scale: 6)?.rawValue, 92_233_720_368_547_758)
+
+		FDec.decimalPlaces = 2
+		XCTAssertEqual(FDec(raw: 123_456, scale: 4)?.rawValue, 1235)
+		XCTAssertEqual(FDec(raw: 12, scale: 0)?.rawValue, 1200)
+	}
+
+	func test_RawValueAtScale() {
+		let x = raw(123_456) // 12.3456
+
+		XCTAssertEqual(x.rawValue(scale: 4), 123_456)
+		XCTAssertEqual(x.rawValue(scale: 6), 12_345_600)
+		XCTAssertEqual(x.rawValue(scale: 2), 1235)
+		XCTAssertEqual(x.rawValue(scale: 2, rounding: .down), 1234)
+		XCTAssertEqual(x.rawValue(scale: 0), 12)
+		XCTAssertEqual((-x).rawValue(scale: 2), -1235)
+		XCTAssertEqual(make(1).rawValue(scale: 18), 1_000_000_000_000_000_000)
+
+		XCTAssertNil(make(100).rawValue(scale: 18))
+		XCTAssertNil(x.rawValue(scale: 19))
+		XCTAssertNil(x.rawValue(scale: -1))
+		XCTAssertNil(nan.rawValue(scale: 2))
+		XCTAssertNil(inf.rawValue(scale: 2))
+	}
+
+	/// A finer scale holds every value of a coarser one, so the trip there and back is lossless.
+	func test_ScaleConversion_RoundTrip() {
+		for (places, finer) in [(0, 6), (2, 4), (4, 9), (4, 4)] {
+			FDec.decimalPlaces = places
+
+			for _ in 0 ..< 500 {
+				let original = raw(Int.random(in: -1_000_000_000 ... 1_000_000_000))
+				let stored = original.rawValue(scale: finer)
+
+				XCTAssertNotNil(stored)
+				XCTAssertEqual(FDec(raw: stored ?? 0, scale: finer)?.rawValue, original.rawValue, "\(original.rawValue) @\(places) via \(finer)")
+			}
+		}
+	}
+
+}
+
+final class Test_LocaleText: FDecTestCase {
+
+	private let en = Locale(identifier: "en_US")
+	private let de = Locale(identifier: "de_DE")
+	private let hu = Locale(identifier: "hu_HU")
+
+	func test_Locale_Formatted() {
+		let n = make(1_234_567, 5000)
+
+		XCTAssertEqual(n.formatted(locale: en), "1,234,567.5")
+		XCTAssertEqual(n.formatted(locale: de), "1.234.567,5")
+		XCTAssertEqual(n.formatted(locale: de, fractionDigits: 2), "1.234.567,50")
+		XCTAssertEqual(n.formatted(locale: en, fractionDigits: 0), "1,234,568")
+		XCTAssertEqual(n.formatted(locale: en, groupingSize: 0), "1234567.5")
+		XCTAssertEqual(n.formatted(locale: en, fullSign: true), "+1,234,567.5")
+		XCTAssertEqual((-n).formatted(locale: de, fractionDigits: 1), "-1.234.567,5")
+		XCTAssertEqual(make(0).formatted(locale: de, fractionDigits: 2), "0,00")
+
+		// Hungarian groups with a space-like character that differs between systems.
+		let space = hu.groupingSeparator ?? ""
+		XCTAssertEqual(n.formatted(locale: hu), "1\(space)234\(space)567,5")
+	}
+
+	func test_Locale_Parsing() {
+		let expected = 12_345_675_000
+
+		XCTAssertEqual(FDec("1,234,567.5", locale: en)?.rawValue, expected)
+		XCTAssertEqual(FDec("1234567.5", locale: en)?.rawValue, expected)
+		XCTAssertEqual(FDec("1.234.567,5", locale: de)?.rawValue, expected)
+		XCTAssertEqual(FDec("1234567,5", locale: de)?.rawValue, expected)
+		XCTAssertEqual(FDec("-0,5", locale: de)?.rawValue, -5000)
+
+		// Every kind of space is accepted where the locale groups with one.
+		XCTAssertEqual(FDec("1 234 567,5", locale: hu)?.rawValue, expected)
+		XCTAssertEqual(FDec("1\u{00A0}234\u{00A0}567,5", locale: hu)?.rawValue, expected)
+		XCTAssertEqual(FDec("1\u{202F}234\u{202F}567,5", locale: hu)?.rawValue, expected)
+
+		// A point is not part of a Hungarian number, and two decimal separators are one too many.
+		XCTAssertNil(FDec("1.5", locale: hu))
+		XCTAssertNil(FDec("1,2,3", locale: de))
+		XCTAssertNil(FDec("", locale: de))
+		XCTAssertNil(FDec("abc", locale: en))
+		XCTAssertNil(FDec("1 234.5", locale: en)) // a space does not group in en_US
+
+		// Grouping separators are dropped wherever they stand: in en_US "1,5" is fifteen.
+		XCTAssertEqual(FDec("1,5", locale: en)?.rawValue, 150_000)
+	}
+
+	func test_Locale_RoundTrip() {
+		for identifier in ["en_US", "de_DE", "hu_HU", "fr_FR", "de_CH", "sv_SE", "en_IN", "ja_JP"] {
+			let locale = Locale(identifier: identifier)
+
+			for _ in 0 ..< 200 {
+				let original = raw(Int.random(in: -1_000_000_000_000 ... 1_000_000_000_000))
+
+				XCTAssertEqual(FDec(original.formatted(locale: locale), locale: locale)?.rawValue, original.rawValue, "\(original.rawValue) \(identifier)")
+				XCTAssertEqual(FDec(original.formatted(locale: locale, fractionDigits: 6), locale: locale)?.rawValue, original.rawValue, "fixed \(original.rawValue) \(identifier)")
+			}
+		}
+	}
+
+	func test_FormatStyle() throws {
+		guard #available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *) else { return }
+
+		let n = make(1_234_567, 5000)
+
+		XCTAssertEqual(n.formatted(.fdec.locale(en)), "1,234,567.5")
+		XCTAssertEqual(n.formatted(.fdec.locale(de).precision(2)), "1.234.567,50")
+		XCTAssertEqual(n.formatted(.fdec.locale(en).grouping(false)), "1234567.5")
+		XCTAssertEqual(n.formatted(.fdec.locale(en).sign(always: true).precision(0)), "+1,234,568")
+		XCTAssertEqual(nan.formatted(.fdec.locale(en).precision(2)), "NaN")
+		XCTAssertEqual(FDec.Style().locale(en).format(raw(-5000)), "-0.5")
+
+		// The style is a value: the modifiers return copies, and it survives coding.
+		let style = FDec.Style().locale(de).precision(3).grouping(false)
+		XCTAssertEqual(FDec.Style().locale(de).precision(3).grouping(false), style)
+		XCTAssertNotEqual(style.precision(2), style)
+
+		let decoded = try JSONDecoder().decode(FDec.Style.self, from: JSONEncoder().encode(style))
+		XCTAssertEqual(decoded, style)
+		XCTAssertEqual(decoded.format(n), "1234567,500")
 	}
 
 }

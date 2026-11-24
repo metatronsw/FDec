@@ -29,7 +29,7 @@ swift test --filter Test_Arithmetic/test_Mul_OtherScales
 
 Első elemzés: 2026-11-24, teljes kódolvasás, `swift build` / `swift test`, és egy külön próbaprogram kb. 150 esettel (az összeomlás-gyanús hívások külön folyamatban). Ugyanaznap a hibák egyenként, a szerzővel egyeztetve javítva lettek. Környezet: Swift 5.9.2, macOS 13, x86_64.
 
-**Jelenlegi állapot:** 93 teszt zöld egyetlen fájlban, debug és release build figyelmeztetés nélkül fordul. A korábban összeomló 30 próbaeset mind lefut.
+**Jelenlegi állapot:** 102 teszt zöld egyetlen fájlban, debug és release build figyelmeztetés nélkül fordul. A korábban összeomló 30 próbaeset mind lefut.
 
 ## 1. Javított hibák és a meghozott döntések
 
@@ -90,12 +90,15 @@ Első elemzés: 2026-11-24, teljes kódolvasás, `swift build` / `swift test`, �
 - `squareRoot()` – egész alapú, minden skálán az utolsó jegyig pontos, vágott gyök. A régi `sqrt()` (Double-ön át) változatlanul megmaradt.
 - `floor(places:)`, `ceil(places:)`, `truncated(places:)`, `isWhole`, `signum()`, `clamped(to:)`.
 - `Sequence<FDec>.sum()` és `average(rounding:)` – 128 bites összegzés, így a közben túlcsorduló, de végül elférő összeg is helyes.
+- `addingReportingOverflow` / `subtracting…` / `multiplied…(by:)` / `divided…(by:)` – a szokásos eredmény és egy jelző; a jelző minden nem véges eredményre igaz (NaN-ra és eleve nem véges operandusra is).
+- `FDec.greatestFiniteMagnitude`, `FDec.leastNonzeroMagnitude`. Szándékosan nem `max` / `min` a nevük: egy `FDec.max` statikus tag a típuson belül eltakarná a `max(a, b)` függvényt.
+- `init?(raw:scale:rounding:)` és `rawValue(scale:rounding:)` – más skálán tárolt nyers érték beolvasása és kiírása (adatbázis-oszlophoz).
+- `init?(_:locale:)` és `formatted(locale:fractionDigits:…)` – a locale elválasztóival. A beolvasás a tagoló jeleket bárhol eldobja (nem ellenőrzi, hogy hármasával állnak-e), ezért `en_US` alatt az `"1,5"` tizenöt.
+- `FDec.Style` (`Foundation.FormatStyle`, macOS 12 / iOS 15-től) és `value.formatted(.fdec.precision(2))`; SwiftUI-ban `Text(value, format: .fdec)`. A kerekítés itt mindig féltől felfelé történik. Linuxon nem ellenőrzött.
 
 ### Hiányzó funkciók
 - `Int`-es `+` és `-` operátor (ma csak `Int32`-re van).
-- `formatted` `Locale` paraméterrel, `FormatStyle` megfelelés, szöveg beolvasása locale szerint.
-- `addingReportingOverflow` / `multipliedReportingOverflow`, `FDec.max` / `min` / `ulp`.
-- Skálaváltás (`rescaled(to:)`).
+- Pénznem szerinti formázás (`.currency(code:)`), `ParseableFormatStyle`.
 - Tartós megoldás a globális skálára: a skála típusba emelése (`FDec<Scale>`) vagy a beállítás egyszer írhatóvá tétele.
 
 ### Csomagolás
@@ -117,7 +120,7 @@ Az eredeti tesztfájl és a javításokhoz írt regressziós fájl egyetlen fáj
 | `Test_SpecialValues` | `nan` és a végtelenek azonosítása, terjedése, kiírása, összehasonlítása |
 | `Test_Protocols` | `Comparable`, `Hashable`, `Strideable`, `Codable` |
 | `Test_Random` | `random(in:)` és `random(_:_:)` |
-| `Test_Decimal`, `Test_FixedFormat`, `Test_Allocation`, `Test_Percent`, `Test_Sendable`, `Test_WholeNumberOperators`, `Test_PowerAndRoot`, `Test_Helpers`, `Test_Sums` | a `FDec+Extensions.swift` függvényei |
+| `Test_Decimal`, `Test_FixedFormat`, `Test_Allocation`, `Test_Percent`, `Test_Sendable`, `Test_WholeNumberOperators`, `Test_PowerAndRoot`, `Test_Helpers`, `Test_Sums`, `Test_Limits`, `Test_ScaleConversion`, `Test_LocaleText` | a `FDec+Extensions.swift` függvényei |
 
 ## 4. Ami tesztből még hiányzik
 

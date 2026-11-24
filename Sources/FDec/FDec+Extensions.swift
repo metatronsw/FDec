@@ -8,7 +8,8 @@
 //
 //  Additions to FDec that build only on the API of FDec.swift:
 //  Decimal bridging, fixed-digit formatting, allocation, percentages, Sendable,
-//  whole-number operators, powers, an exact square root, rounding shorthands and sums.
+//  whole-number operators, powers, an exact square root, rounding shorthands and sums,
+//  overflow reporting, limits, scale conversion, locale-aware text and a FormatStyle.
 
 import Foundation
 
@@ -463,5 +464,200 @@ private struct WideSum {
 		let raw = Int(quotient)
 		return FDec(raw: negative ? -raw : raw)
 	}
+
+}
+
+// MARK: - Overflow reporting and limits
+
+extension FDec {
+
+	/// The largest finite value, one step below `.infinity`. The smallest one is its negation.
+	public static var greatestFiniteMagnitude: FDec { FDec(raw: Int.max - 1) }
+
+	/// The smallest positive value, which is also the distance between neighbouring values:
+	/// 0.0001 at four decimals.
+	public static var leastNonzeroMagnitude: FDec { FDec(raw: 1) }
+
+	// The reporting variants return the ordinary result together with a flag, for callers who
+	// want to act on an overflow at once. `overflow` is true whenever the result is not finite,
+	// which also covers nan and operands that were already not finite.
+
+	public func addingReportingOverflow(_ other: FDec) -> (partialValue: FDec, overflow: Bool) {
+		let result = self + other
+		return (result, !result.isFinite)
+	}
+
+	public func subtractingReportingOverflow(_ other: FDec) -> (partialValue: FDec, overflow: Bool) {
+		let result = self - other
+		return (result, !result.isFinite)
+	}
+
+	public func multipliedReportingOverflow(by other: FDec) -> (partialValue: FDec, overflow: Bool) {
+		let result = self * other
+		return (result, !result.isFinite)
+	}
+
+	public func dividedReportingOverflow(by other: FDec) -> (partialValue: FDec, overflow: Bool) {
+		let result = self / other
+		return (result, !result.isFinite)
+	}
+
+}
+
+// MARK: - Scale conversion
+
+extension FDec {
+
+	/// Reads a raw value that was stored with `scale` decimal places, whatever the current
+	/// scale is: `FDec(raw: 1234, scale: 2)` is 12.34. Digits the current scale cannot hold
+	/// are rounded by `rule`. Returns `nil` for a scale outside 0...18 or a value that does not fit.
+	public init?(raw: Int, scale: Int, rounding rule: FloatingPointRoundingRule = .toNearestOrAwayFromZero) {
+		guard let converted = Self.rescale(raw, from: scale, to: Self.decimalPlaces, rounding: rule) else { return nil }
+		self.init(raw: converted)
+	}
+
+	/// The raw value as it would be stored with `scale` decimal places: 12.34 at scale 2 is 1234.
+	/// Returns `nil` for nan and the infinities, a scale outside 0...18, or a value that does not fit.
+	public func rawValue(scale: Int, rounding rule: FloatingPointRoundingRule = .toNearestOrAwayFromZero) -> Int? {
+		guard isFinite else { return nil }
+		return Self.rescale(rawValue, from: Self.decimalPlaces, to: scale, rounding: rule)
+	}
+
+	private static func rescale(_ raw: Int, from source: Int, to target: Int, rounding rule: FloatingPointRoundingRule) -> Int? {
+		guard (0 ... 18).contains(source), (0 ... 18).contains(target) else { return nil }
+
+		var factor = 1
+		for _ in 0 ..< abs(target - source) { factor *= 10 } // at most 10^18
+
+		let result: Int
+
+		if target >= source {
+			let scaled = raw.multipliedReportingOverflow(by: factor)
+			guard !scaled.overflow else { return nil }
+			result = scaled.partialValue
+		} else {
+			let unit = UInt(factor)
+			var (quotient, remainder) = raw.magnitude.quotientAndRemainder(dividingBy: unit)
+
+			if Rest(remainder: remainder, divisor: unit).stepsAway(rule, negative: raw < 0, quotientIsOdd: quotient & 1 == 1) {
+				quotient += 1 // cannot overflow: the quotient is at most a tenth of UInt.max
+			}
+
+			result = raw < 0 ? -Int(quotient) : Int(quotient)
+		}
+
+		// The extreme raw values are reserved for nan and the infinities.
+		return FDec(raw: result).isFinite ? result : nil
+	}
+
+}
+
+// MARK: - Locale-aware text
+
+extension FDec {
+
+	/// Parses text written with the separators of `locale`, such as "1.234,5" for German.
+	/// The grouping separators are dropped wherever they stand, the decimal separator is
+	/// translated, and the rest goes through the strict parser of `init?(_:)`.
+	/// For a locale that groups with a space, the plain, the no-break and the narrow
+	/// no-break space are all accepted.
+	public init?(_ text: String, locale: Locale) {
+		let decimal = locale.decimalSeparator ?? "."
+		let grouping = locale.groupingSeparator ?? ""
+
+		var clean = text
+
+		if !grouping.isEmpty, grouping != decimal {
+			let spaces = [" ", "\u{00A0}", "\u{202F}"]
+			for separator in spaces.contains(grouping) ? spaces : [grouping] {
+				clean = clean.replacingOccurrences(of: separator, with: "")
+			}
+		}
+
+		if decimal != "." {
+			// A point that is neither separator of this locale does not belong in the number.
+			guard !clean.contains(".") else { return nil }
+			clean = clean.replacingOccurrences(of: decimal, with: ".")
+		}
+
+		self.init(clean)
+	}
+
+	/// Text with the separators of `locale`. With `fractionDigits` the number of decimals is
+	/// fixed (rounded half away from zero); without it the trailing zeros are dropped.
+	public func formatted(locale: Locale, fractionDigits: Int? = nil, fullSign: Bool = false, groupingSize: Int = 3) -> String {
+		let decimal = locale.decimalSeparator ?? "."
+		let grouping = locale.groupingSeparator ?? ""
+
+		guard let fractionDigits else {
+			return formatted(fullSign: fullSign, groupingSize: groupingSize, decimalSeparator: decimal, groupingSeparator: grouping)
+		}
+
+		return formatted(fractionDigits: fractionDigits, fullSign: fullSign, groupingSize: groupingSize,
+							  decimalSeparator: decimal, groupingSeparator: grouping)
+	}
+
+}
+
+// MARK: - FormatStyle
+
+@available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *)
+extension FDec {
+
+	/// A Foundation format style, for `value.formatted(.fdec.precision(2))`
+	/// and SwiftUI's `Text(value, format: .fdec)`.
+	public struct Style: Foundation.FormatStyle {
+
+		/// The fixed number of decimals, or `nil` to drop the trailing zeros.
+		public var fractionDigits: Int?
+		public var usesGrouping = true
+		public var showsPlusSign = false
+		public var locale: Locale = .autoupdatingCurrent
+
+		public init() {}
+
+		public func format(_ value: FDec) -> String {
+			value.formatted(locale: locale, fractionDigits: fractionDigits, fullSign: showsPlusSign, groupingSize: usesGrouping ? 3 : 0)
+		}
+
+		/// Exactly this many decimals, rounded half away from zero.
+		public func precision(_ fractionDigits: Int) -> Style {
+			var copy = self
+			copy.fractionDigits = fractionDigits
+			return copy
+		}
+
+		public func grouping(_ enabled: Bool) -> Style {
+			var copy = self
+			copy.usesGrouping = enabled
+			return copy
+		}
+
+		/// Writes a "+" in front of positive values.
+		public func sign(always: Bool) -> Style {
+			var copy = self
+			copy.showsPlusSign = always
+			return copy
+		}
+
+		public func locale(_ locale: Locale) -> Style {
+			var copy = self
+			copy.locale = locale
+			return copy
+		}
+
+	}
+
+	public func formatted<S>(_ style: S) -> S.FormatOutput where S: Foundation.FormatStyle, S.FormatInput == FDec {
+		style.format(self)
+	}
+
+}
+
+@available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *)
+extension FormatStyle where Self == FDec.Style {
+
+	/// The FDec format style: locale separators, grouping by three, trailing zeros dropped.
+	public static var fdec: FDec.Style { FDec.Style() }
 
 }

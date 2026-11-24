@@ -58,6 +58,46 @@ With `n` decimal places the largest magnitude is about `9.22 × 10^(18 - n)`, wh
 
 `%` is the remainder of the truncating division, like `Int`: `5.5 % 2` is `1.5` and the sign follows the dividend. `quotientAndRemainder(dividingBy:)` returns a whole quotient together with that remainder.
 
+Multiplying or dividing by a plain `Int` needs no scaling, so it is exact and also works for a factor that would be too large as an FDec:
+
+```Swift
+	let count = 7
+	let total = price * count
+	let each = total / count
+```
+
+More helpers:
+
+```Swift
+	x.floor()   x.ceil()   x.truncated()      // 12, 13, 12 for 12.3456; all take places:
+	x.isWhole   x.signum()                     // false, 1
+	x.clamped(to: 0 ... 10)                    // 10
+
+	FDec(2).raised(to: 10)                     // 1024
+	pow(FDec(2), -2)                           // 0.25
+	FDec(2).squareRoot()                       // 1.4142, exact to the last digit at every scale
+
+	[a, b, c].sum()                            // accumulated on 128 bits
+	[a, b, c].average()                        // FDec?, nil when empty
+```
+
+`raised(to:)` rounds at every multiplication, so with fractions the last digits can differ from the exactly rounded power. `squareRoot()` works on integers; the older `sqrt()` goes through `Double` and is accurate to about 15 significant digits.
+
+## Money helpers
+
+```Swift
+	let net: FDec = 19.99
+
+	net.percent(27)                  // 5.3973, one rounding at the end
+	net.adding(percent: 27)          // 25.3873
+	net.subtracting(percent: 10)     // 17.991
+
+	FDec(100).allocated(into: 3)                 // [33.3334, 33.3333, 33.3333]
+	FDec(100).allocated(ratios: [70, 20, 10])    // [70, 20, 10]
+```
+
+The percentage functions round half away from zero unless you pass another `rounding:`. The shares of `allocated` always add up to the original value exactly: what cannot be divided evenly is handed out one smallest unit at a time, starting with the first share. Unusable input (no parts, a negative ratio, a zero total) gives an empty array.
+
 ## Overflow, infinity and NaN
 
 Arithmetic never traps. The special values behave like those of `Double`:
@@ -66,6 +106,14 @@ Arithmetic never traps. The special values behave like those of `Double`:
 - A division or remainder by zero gives `FDec.nan`.
 - `nan` is contagious, `infinity - infinity` and `infinity * 0` are `nan`, and a finite value divided by infinity is zero.
 - `nan` is not equal to anything, itself included, and every ordered comparison with it is false. Test for it with `isNan`; use `isFinite` to tell ordinary numbers from all three special values.
+
+To act on an overflow at once, use the reporting variants, which return the result together with a flag:
+
+```Swift
+	let (sum, overflow) = a.addingReportingOverflow(b)
+```
+
+`subtractingReportingOverflow`, `multipliedReportingOverflow(by:)` and `dividedReportingOverflow(by:)` work the same way. The limits of the type are `FDec.greatestFiniteMagnitude` and `FDec.leastNonzeroMagnitude`, the latter being the smallest step of the current scale.
 
 ## Output
 
@@ -79,6 +127,22 @@ Arithmetic never traps. The special values behave like those of `Double`:
 
 `formatted()` takes its separators from the current locale unless you pass them. The special values are written as `NaN`, `Infinity` and `-Infinity`.
 
+A fixed number of decimals, a specific locale, and Foundation's format styles:
+
+```Swift
+	let german = Locale(identifier: "de_DE")
+
+	n.formatted(fractionDigits: 2, decimalSeparator: ".", groupingSeparator: ",")  // "1,234,567.50"
+	n.formatted(locale: german)                                                    // "1.234.567,5"
+	n.formatted(locale: german, fractionDigits: 2)                                 // "1.234.567,50"
+	FDec("1.234.567,5", locale: german)                                            // FDec?, 1234567.5
+
+	n.formatted(.fdec.locale(german).precision(2))                                 // "1.234.567,50"
+	Text(n, format: .fdec.precision(2))                                            // SwiftUI
+```
+
+`formatted(fractionDigits:)` rounds half away from zero by default and never prints a negative zero. The locale-aware parser drops the grouping separators wherever they stand and then applies the strict rules, so in `en_US` the text `"1,5"` is fifteen. The `.fdec` format style needs macOS 12 / iOS 15 or later.
+
 ## Serialization and databases
 
 `FDec` is `Codable`. It encodes as decimal text, which does not depend on the scale, so a file written with one `decimalPlaces` setting is read correctly with another:
@@ -91,6 +155,19 @@ For compatibility the decoder also accepts a plain integer and reads it as the r
 
 In databases like SQLite and MySQL an `FDec` can be stored as a single integer through `rawValue` and restored with `FDec(raw:)`, enabling fast storage, retrieval, and numeric searches. Keep the scale fixed for such a column.
 
+When the column has its own fixed scale, convert explicitly, so the stored integers stay valid whatever `decimalPlaces` the program runs with:
+
+```Swift
+	let stored = price.rawValue(scale: 2)        // Int?, 1999 for 19.99
+	let price = FDec(raw: 1999, scale: 2)        // FDec?, 19.99
+```
+
+## Decimal and concurrency
+
+`FDec(decimal)` converts a Foundation `Decimal`, rounding digits beyond the scale to the nearest value; `asDecimal` and `Decimal(fdec)` go the other way. `Decimal` has no infinity, so the special values become `Decimal.nan`.
+
+`FDec` is `Sendable`: values can be passed between tasks and threads.
+
 ## Random values
 
 ```Swift
@@ -102,4 +179,4 @@ In databases like SQLite and MySQL an `FDec` can be stored as a single integer t
 ## Limitations
 
 - The scale is global and not thread-safe; set it before any other use.
-- `sqrt` goes through `Double`, so it is only accurate to about 15 significant digits.
+- `sqrt` goes through `Double`, so it is only accurate to about 15 significant digits; use `squareRoot()` for an exact result.
